@@ -1,4 +1,4 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5001";
 
 const request = async (path, options = {}) => {
   const response = await fetch(`${API_BASE_URL}${path}`, {
@@ -34,4 +34,11 @@ export const forgotPassword = (payload) =>
   request("/api/auth/forgot-password", {
     method: "POST",
     body: JSON.stringify(payload)
+  });
+
+export const getMe = () => request("/api/auth/me", { method: "GET" });
+
+export const logout = () =>
+  request("/api/auth/logout", {
+    method: "POST"
   });
