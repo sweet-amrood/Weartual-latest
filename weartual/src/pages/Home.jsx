@@ -1,4 +1,5 @@
 import React, { useMemo, useRef, useState, useEffect } from "react";
+import { uploadMyImage } from "../services/imageApi";
 import { 
   UploadCloud, 
   Trash2, 
@@ -29,6 +30,7 @@ export default function Home() {
   const [processingText, setProcessingText] = useState("");
   const [error, setError] = useState("");
   const [resultImage, setResultImage] = useState(null);
+  const [isSavingImage, setIsSavingImage] = useState(false);
 
   const personInputRef = useRef(null);
   const garmentInputRef = useRef(null);
@@ -81,6 +83,23 @@ export default function Home() {
     setResultImage(null);
   };
 
+  const saveJobToDb = async () => {
+    if (!personFile || !garmentFile) throw new Error("Both images are required");
+    setIsSavingImage(true);
+    try {
+      const response = await uploadMyImage({ imageFile: personFile, garmentFile });
+      return response?.job;
+    } catch (err) {
+      throw new Error(err?.message || "Could not save job to database");
+    } finally {
+      setIsSavingImage(false);
+    }
+  };
+
+  const handleFileSelect = async (type, file) => {
+    setPreview(type, file);
+  };
+
   const removeImage = (type) => {
     setError("");
     setStatus("idle");
@@ -100,35 +119,44 @@ export default function Home() {
     if (garmentInputRef.current) garmentInputRef.current.value = "";
   };
 
-  const runTryOn = () => {
+  const runTryOn = async () => {
     if (!personPreview || !garmentPreview) {
       setError("Require multi-modal inputs to initialize the pipeline.");
       return;
     }
     if (isProcessing) return;
 
-    setError("");
-    setStatus("analyzing");
+    try {
+      setError("");
+      setStatus("analyzing");
+      const job = await saveJobToDb();
+      if (!job?.resultUrl) {
+        throw new Error("Result image URL was not generated");
+      }
 
-    // Simulated Neural Pipeline
-    window.setTimeout(() => {
-      setStatus("mapping");
+      // Simulated Neural Pipeline
       window.setTimeout(() => {
-        setStatus("synthesizing");
+        setStatus("mapping");
         window.setTimeout(() => {
-          setResultImage(personPreview); // Simulated output
-          setStatus("success");
+          setStatus("synthesizing");
           window.setTimeout(() => {
-            if (resultRef.current) {
-               window.scrollTo({
-                 top: resultRef.current.offsetTop - 100,
-                 behavior: "smooth"
-               });
-            }
-          }, 100);
-        }, 1800);
-      }, 1500);
-    }, 1200);
+            setResultImage(job.resultUrl);
+            setStatus("success");
+            window.setTimeout(() => {
+              if (resultRef.current) {
+                 window.scrollTo({
+                   top: resultRef.current.offsetTop - 100,
+                   behavior: "smooth"
+                 });
+              }
+            }, 100);
+          }, 1800);
+        }, 1500);
+      }, 1200);
+    } catch (uploadErr) {
+      setStatus("error");
+      setError(uploadErr.message);
+    }
   };
 
   const downloadResult = () => {
@@ -205,7 +233,7 @@ export default function Home() {
                 ref={personInputRef}
                 className="hidden"
                 accept="image/jpeg,image/png,image/webp"
-                onChange={(e) => setPreview("person", e.target.files?.[0] || null)}
+                onChange={(e) => handleFileSelect("person", e.target.files?.[0] || null)}
               />
 
               {personPreview ? (
@@ -267,7 +295,7 @@ export default function Home() {
                 ref={garmentInputRef}
                 className="hidden"
                 accept="image/jpeg,image/png,image/webp"
-                onChange={(e) => setPreview("garment", e.target.files?.[0] || null)}
+                onChange={(e) => handleFileSelect("garment", e.target.files?.[0] || null)}
               />
 
               {garmentPreview ? (
@@ -311,6 +339,11 @@ export default function Home() {
 
         {/* Neural Execution Station */}
         <div className="flex flex-col items-center justify-center mb-16 animate-fade-in-up" style={{ animationDelay: '0.3s' }}>
+          {isSavingImage && (
+            <p className="font-mono text-xs text-slate-500 mb-3 tracking-wide uppercase">
+              Syncing image to database...
+            </p>
+          )}
           
           <button
             onClick={runTryOn}

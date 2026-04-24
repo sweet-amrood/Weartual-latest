@@ -12,9 +12,10 @@ const requestJson = async (path, options = {}) => {
 
 export const listMyImages = () => requestJson("/api/images/me", { method: "GET" });
 
-export const uploadMyImage = async (file) => {
+export const uploadMyImage = async ({ imageFile, garmentFile }) => {
   const form = new FormData();
-  form.append("image", file);
+  form.append("image", imageFile);
+  form.append("garment", garmentFile);
   return requestJson("/api/images/me", { method: "POST", body: form });
 };
 

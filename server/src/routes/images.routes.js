@@ -7,7 +7,15 @@ const router = Router();
 const upload = multer({ storage: multer.memoryStorage() });
 
 router.get("/me", requireAuth, listMyImages);
-router.post("/me", requireAuth, upload.single("image"), uploadMyImage);
+router.post(
+  "/me",
+  requireAuth,
+  upload.fields([
+    { name: "image", maxCount: 1 },
+    { name: "garment", maxCount: 1 }
+  ]),
+  uploadMyImage
+);
 
 export default router;
 
