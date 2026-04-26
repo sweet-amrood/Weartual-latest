@@ -20,3 +20,6 @@ build/
 coverage/
 tmp/
 temp/
+
+# Local datasets
+dataset small/

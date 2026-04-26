@@ -1,5 +1,6 @@
 mushi/server/result/
 mushi/server/uploads/
+mushi/server/dataset small/
 
 # Environment and secrets
 **/.env
