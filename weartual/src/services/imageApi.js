@@ -19,3 +19,12 @@ export const uploadMyImage = async ({ imageFile, garmentFile }) => {
   return requestJson("/api/images/me", { method: "POST", body: form });
 };
 
+export const listDatasetSamples = (type, offset = 0) =>
+  requestJson(`/api/images/samples?type=${encodeURIComponent(type)}&offset=${encodeURIComponent(offset)}`, { method: "GET" }).then((data) => ({
+    ...data,
+    samples: (data?.samples || []).map((sample) => ({
+      ...sample,
+      url: `${API_BASE_URL}${sample.url}`
+    }))
+  }));
+

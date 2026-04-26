@@ -4,7 +4,8 @@ import Login from './pages/login'
 import Signup from './pages/signup'
 import ForgetPassword from './pages/forgetpassword'
 import Navbar from './components/Navbar'
-import Home from './pages/Home'
+import LandingPage from './pages/LandingPage'
+import TryOnStudio from './pages/TryOnStudio'
 import AboutUs from './pages/AboutUs'
 import Contact from './pages/Contact'
 import { getMe } from './services/authApi'
@@ -51,7 +52,8 @@ export default function App() {
     <Router>
       <Navbar user={user} onLogout={handleLogout} />
       <Routes>
-        <Route path="/" element={<Home />} />
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/studio" element={<TryOnStudio />} />
         <Route path="/about" element={<AboutUs />} />
         <Route path="/contact" element={<Contact />} />
         <Route

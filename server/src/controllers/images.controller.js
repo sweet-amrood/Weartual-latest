@@ -1,5 +1,10 @@
 import asyncHandler from "../utils/asyncHandler.js";
-import { listMyImagesService, uploadImageService } from "../services/images.service.js";
+import {
+  getDatasetSampleFileService,
+  listDatasetSamplesService,
+  listMyImagesService,
+  uploadImageService
+} from "../services/images.service.js";
 
 export const uploadMyImage = asyncHandler(async (req, res) => {
   const job = await uploadImageService({
@@ -14,5 +19,19 @@ export const uploadMyImage = asyncHandler(async (req, res) => {
 export const listMyImages = asyncHandler(async (req, res) => {
   const images = await listMyImagesService(req.user.userId);
   res.status(200).json({ success: true, images });
+});
+
+export const listDatasetSamples = asyncHandler(async (req, res) => {
+  const type = String(req.query.type || "").toLowerCase();
+  const offset = Number.parseInt(String(req.query.offset || "0"), 10);
+  const samples = await listDatasetSamplesService(type, Number.isNaN(offset) ? 0 : offset);
+  res.status(200).json({ success: true, samples });
+});
+
+export const getDatasetSampleFile = asyncHandler(async (req, res) => {
+  const type = String(req.query.type || "").toLowerCase();
+  const name = String(req.query.name || "");
+  const filePath = await getDatasetSampleFileService({ type, name });
+  res.sendFile(filePath);
 });
 

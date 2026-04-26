@@ -1,0 +1,22 @@
+result/
+uploads/
+
+# Environment and secrets
+.env
+.env.*
+*.pem
+*.key
+
+# Dependencies
+node_modules/
+
+# Logs and runtime
+logs/
+*.log
+
+# Build / temp files
+dist/
+build/
+coverage/
+tmp/
+temp/
