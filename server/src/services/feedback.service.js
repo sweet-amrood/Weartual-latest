@@ -1,6 +1,5 @@
 import AppError from "../utils/AppError.js";
 import Feedback from "../models/Feedback.js";
-import { sendFeedbackConfirmationEmail, sendFeedbackNotificationToCompany } from "../utils/email.js";
 
 const sanitizeFeedback = (doc) => ({
   id: doc._id,
@@ -32,44 +31,6 @@ export const createFeedbackService = async ({ name, email, feedback }) => {
       throw new AppError(firstMessage || "Invalid feedback payload", 400);
     }
     throw error;
-  }
-
-  // Keep feedback submission successful even if email provider is temporarily unavailable.
-  let userMailResult;
-  let companyMailResult;
-  try {
-    [userMailResult, companyMailResult] = await Promise.allSettled([
-      sendFeedbackConfirmationEmail({ name: normalizedName, email: normalizedEmail }),
-      sendFeedbackNotificationToCompany({
-        name: normalizedName,
-        email: normalizedEmail,
-        feedback: normalizedFeedback
-      })
-    ]);
-  } catch (error) {
-    // Defensive fallback: Promise.allSettled should not throw, but keep API success if this path is hit.
-    console.error(
-      `[feedback][email][unexpected] email=${normalizedEmail} reason=${error?.message || "unknown error"}`
-    );
-    return sanitizeFeedback(doc);
-  }
-
-  if (userMailResult?.status === "rejected") {
-    console.error(
-      `[feedback][email-confirmation][failed] email=${normalizedEmail} reason=${userMailResult.reason?.message || "unknown error"}`
-    );
-  } else {
-    console.log(`[feedback][email-confirmation][ok] email=${normalizedEmail}`);
-  }
-
-  if (companyMailResult?.status === "rejected") {
-    console.error(
-      `[feedback][email-company-alert][failed] companyEmail=${process.env.COMPANY_EMAIL || "weartual@gmail.com"} reason=${companyMailResult.reason?.message || "unknown error"}`
-    );
-  } else {
-    console.log(
-      `[feedback][email-company-alert][ok] companyEmail=${process.env.COMPANY_EMAIL || "weartual@gmail.com"}`
-    );
   }
 
   return sanitizeFeedback(doc);

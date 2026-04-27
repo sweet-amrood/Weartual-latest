@@ -2,7 +2,6 @@ import crypto from "crypto";
 import User from "../models/User.js";
 import AppError from "../utils/AppError.js";
 import { signJwt } from "../utils/token.js";
-import { sendPasswordResetEmail } from "../utils/email.js";
 
 const sanitizeUser = (user) => ({
   id: user._id,
@@ -49,7 +48,7 @@ export const forgotPasswordService = async (email) => {
   await user.save({ validateBeforeSave: false });
 
   const resetUrl = `${process.env.CLIENT_URL}/reset-password/${rawToken}`;
-  await sendPasswordResetEmail(user.email, resetUrl);
+  console.log(`[auth][forgot-password] reset URL generated for ${user.email}: ${resetUrl}`);
 
   return {
     message: "If this email exists, a password reset link has been sent."
