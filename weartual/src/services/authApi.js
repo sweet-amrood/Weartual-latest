@@ -30,6 +30,12 @@ export const login = (payload) =>
     body: JSON.stringify(payload)
   });
 
+export const googleAuth = (payload) =>
+  request("/api/auth/google", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+
 export const forgotPassword = (payload) =>
   request("/api/auth/forgot-password", {
     method: "POST",

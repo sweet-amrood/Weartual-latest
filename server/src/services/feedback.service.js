@@ -5,25 +5,25 @@ const sanitizeFeedback = (doc) => ({
   id: doc._id,
   name: doc.name,
   email: doc.email,
-  feedback: doc.feedback,
+  message: doc.feedback,
   createdAt: doc.createdAt
 });
 
-export const createFeedbackService = async ({ name, email, feedback }) => {
+export const createFeedbackService = async ({ name, email, message }) => {
   if (!name?.trim()) throw new AppError("Name is required", 400);
   if (!email?.trim()) throw new AppError("Email is required", 400);
-  if (!feedback?.trim()) throw new AppError("Feedback is required", 400);
+  if (!message?.trim()) throw new AppError("Message is required", 400);
 
   const normalizedName = name.trim();
   const normalizedEmail = email.trim().toLowerCase();
-  const normalizedFeedback = feedback.trim();
+  const normalizedMessage = message.trim();
 
   let doc;
   try {
     doc = await Feedback.create({
       name: normalizedName,
       email: normalizedEmail,
-      feedback: normalizedFeedback
+      feedback: normalizedMessage
     });
   } catch (error) {
     if (error?.name === "ValidationError") {

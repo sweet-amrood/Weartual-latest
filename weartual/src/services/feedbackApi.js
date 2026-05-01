@@ -12,7 +12,8 @@ const request = async (path, options = {}) => {
 
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new Error(data.message || "Request failed");
+    const firstFieldError = Array.isArray(data.errors) ? data.errors[0]?.message : "";
+    throw new Error(firstFieldError || data.message || "Failed to submit feedback");
   }
 
   return data;

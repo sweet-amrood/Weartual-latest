@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import { OAuth2Client } from "google-auth-library";
 import User from "../models/User.js";
 import AppError from "../utils/AppError.js";
 import { signJwt } from "../utils/token.js";
@@ -9,6 +10,27 @@ const sanitizeUser = (user) => ({
   email: user.email,
   createdAt: user.createdAt
 });
+
+const buildBaseUsername = (value = "user") =>
+  value
+    .toLowerCase()
+    .replace(/[^a-z0-9_]/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 24) || "user";
+
+const buildUniqueUsername = async (seed) => {
+  const base = buildBaseUsername(seed);
+  let candidate = base;
+  let counter = 0;
+
+  while (await User.findOne({ username: candidate })) {
+    counter += 1;
+    candidate = `${base}_${counter}`.slice(0, 30);
+  }
+
+  return candidate;
+};
 
 export const signupService = async ({ username, email, password }) => {
   const existingEmail = await User.findOne({ email });
@@ -32,6 +54,45 @@ export const loginService = async ({ email, password }) => {
 
   const token = signJwt({ userId: user._id });
 
+  return { token, user: sanitizeUser(user) };
+};
+
+export const googleAuthService = async ({ idToken }) => {
+  const googleClientId = process.env.GOOGLE_CLIENT_ID;
+  if (!googleClientId) {
+    throw new AppError("Google auth is not configured on server", 503);
+  }
+  const googleClient = new OAuth2Client(googleClientId);
+
+  let payload;
+  try {
+    const ticket = await googleClient.verifyIdToken({
+      idToken,
+      audience: googleClientId
+    });
+    payload = ticket.getPayload();
+  } catch {
+    throw new AppError("Invalid Google token", 401);
+  }
+
+  const email = payload?.email?.toLowerCase();
+  const isEmailVerified = payload?.email_verified;
+  if (!email || !isEmailVerified) {
+    throw new AppError("Google account email is not verified", 400);
+  }
+
+  let user = await User.findOne({ email });
+  if (!user) {
+    const username = await buildUniqueUsername(payload?.name || email.split("@")[0]);
+    const randomPassword = crypto.randomBytes(24).toString("hex");
+    user = await User.create({
+      username,
+      email,
+      password: randomPassword
+    });
+  }
+
+  const token = signJwt({ userId: user._id });
   return { token, user: sanitizeUser(user) };
 };
 

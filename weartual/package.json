@@ -15,6 +15,7 @@
     "@mui/icons-material": "^9.0.0",
     "@mui/lab": "^9.0.0-beta.2",
     "@mui/material": "^9.0.0",
+    "@react-oauth/google": "^0.13.5",
     "@tailwindcss/vite": "^4.2.4",
     "lucide-react": "^1.9.0",
     "mongodb": "^7.2.0",

@@ -43,14 +43,14 @@ export default function Contact() {
     const formData = new FormData(formElement);
     const name = String(formData.get("name") || "").trim();
     const email = String(formData.get("email") || "").trim();
-    const feedback = String(formData.get("message") || "").trim();
+    const message = String(formData.get("message") || "").trim();
 
     setFormError("");
     setFeedbackSent(false);
     setIsSubmitting(true);
 
     try {
-      await submitFeedback({ name, email, feedback });
+      await submitFeedback({ name, email, message });
       setFeedbackSent(true);
       formElement.reset();
     } catch (err) {
@@ -195,7 +195,7 @@ export default function Contact() {
 
           {feedbackSent && (
             <p className="text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3">
-              Thank you for your feedback. Our team will review it and use it to improve the system.
+              Feedback submitted successfully
             </p>
           )}
         </form>

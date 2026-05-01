@@ -30,6 +30,10 @@ export const loginValidation = [
   body("password").notEmpty().withMessage("Password is required")
 ];
 
+export const googleAuthValidation = [
+  body("idToken").notEmpty().withMessage("Google ID token is required")
+];
+
 export const forgotPasswordValidation = [
   body("email").isEmail().withMessage("Valid email is required").normalizeEmail()
 ];

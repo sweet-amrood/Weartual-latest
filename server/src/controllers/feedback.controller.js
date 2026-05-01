@@ -5,7 +5,7 @@ export const submitFeedback = asyncHandler(async (req, res) => {
   const savedFeedback = await createFeedbackService({
     name: req.body.name,
     email: req.body.email,
-    feedback: req.body.feedback
+    message: req.body.message
   });
 
   res.status(201).json({
