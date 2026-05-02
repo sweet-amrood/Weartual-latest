@@ -10,16 +10,21 @@ import {
 import { sendEmail } from "../config/email.js";
 import { cookieOptions } from "../utils/token.js";
 
+const EMAIL_TIMEOUT_MS = 5000;
+
+const dispatchEmailSafely = async ({ to, subject, html, context }) => {
+  try {
+    await Promise.race([
+      sendEmail(to, subject, html),
+      new Promise((resolve) => setTimeout(resolve, EMAIL_TIMEOUT_MS))
+    ]);
+  } catch (error) {
+    console.error(`[auth][${context}] Email dispatch failed:`, error);
+  }
+};
+
 export const signup = asyncHandler(async (req, res) => {
   const { token, user } = await signupService(req.body);
-  res.cookie("token", token, cookieOptions);
-
-  res.status(201).json({
-    success: true,
-    message: "Signup successful",
-    token,
-    user
-  });
 
   const welcomeHtml = `
     <div style="font-family: Arial, sans-serif; line-height: 1.6;">
@@ -30,22 +35,24 @@ export const signup = asyncHandler(async (req, res) => {
     </div>
   `;
 
-  // Fire-and-forget so signup response is never blocked by email sending.
-  sendEmail(user.email, "Welcome to Weartual", welcomeHtml).catch((error) => {
-    console.error("[auth][signup] Welcome email dispatch failed:", error);
+  await dispatchEmailSafely({
+    to: user.email,
+    subject: "Welcome to Weartual",
+    html: welcomeHtml,
+    context: "signup"
+  });
+
+  res.cookie("token", token, cookieOptions);
+  res.status(201).json({
+    success: true,
+    message: "Signup successful",
+    token,
+    user
   });
 });
 
 export const login = asyncHandler(async (req, res) => {
   const { token, user } = await loginService(req.body);
-  res.cookie("token", token, cookieOptions);
-
-  res.status(200).json({
-    success: true,
-    message: "Login successful",
-    token,
-    user
-  });
 
   const loginTime = new Date().toISOString();
   const loginAlertHtml = `
@@ -57,14 +64,25 @@ export const login = asyncHandler(async (req, res) => {
     </div>
   `;
 
-  // Fire-and-forget so login response is never blocked by email sending.
-  sendEmail(user.email, "New login detected", loginAlertHtml).catch((error) => {
-    console.error("[auth][login] Login alert email dispatch failed:", error);
+  await dispatchEmailSafely({
+    to: user.email,
+    subject: "New login detected",
+    html: loginAlertHtml,
+    context: "login"
+  });
+
+  res.cookie("token", token, cookieOptions);
+  res.status(200).json({
+    success: true,
+    message: "Login successful",
+    token,
+    user
   });
 });
 
 export const googleAuth = asyncHandler(async (req, res) => {
-  const { token, user } = await googleAuthService({ idToken: req.body.idToken });
+  const incomingToken = req.body?.token || req.body?.idToken;
+  const { token, user } = await googleAuthService({ idToken: incomingToken });
   res.cookie("token", token, cookieOptions);
 
   res.status(200).json({

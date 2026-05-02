@@ -31,7 +31,13 @@ export const loginValidation = [
 ];
 
 export const googleAuthValidation = [
-  body("idToken").notEmpty().withMessage("Google ID token is required")
+  body().custom((_value, { req }) => {
+    const token = req.body?.token || req.body?.idToken;
+    if (!token) {
+      throw new Error("Google token is required");
+    }
+    return true;
+  })
 ];
 
 export const forgotPasswordValidation = [

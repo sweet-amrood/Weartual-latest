@@ -38,17 +38,22 @@ const Login = ({ onLogin }) => {
   };
 
   const handleGoogleLogin = async (credentialResponse) => {
-    const idToken = credentialResponse?.credential;
-    if (!idToken) {
+    const token = credentialResponse?.credential;
+    if (!token) {
       setError('Google authentication failed. Please try again.');
       return;
+    }
+
+    if (import.meta.env.DEV) {
+      console.info('[Google OAuth][login] received credential length:', token.length);
+      console.info('[Google OAuth][login] credential prefix:', token.slice(0, 16));
     }
 
     setIsSubmitting(true);
     setError('');
 
     try {
-      const response = await googleAuth({ idToken });
+      const response = await googleAuth({ token });
       onLogin(response.user);
     } catch (error) {
       setError(error.message || 'Google login failed. Please try again.');

@@ -58,21 +58,46 @@ export const loginService = async ({ email, password }) => {
 };
 
 export const googleAuthService = async ({ idToken }) => {
-  const googleClientId = process.env.GOOGLE_CLIENT_ID;
-  if (!googleClientId) {
+  const googleClientIds = (process.env.GOOGLE_CLIENT_ID || "")
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+  if (googleClientIds.length === 0) {
     throw new AppError("Google auth is not configured on server", 503);
   }
-  const googleClient = new OAuth2Client(googleClientId);
+  if (!idToken || typeof idToken !== "string") {
+    throw new AppError("Invalid Google token", 401);
+  }
+  const trimmedToken = idToken.trim();
+  if (process.env.NODE_ENV !== "production") {
+    console.info("[auth][google] token received:", {
+      length: trimmedToken.length,
+      prefix: trimmedToken.slice(0, 16),
+      configuredAudiences: googleClientIds
+    });
+  }
+  const googleClient = new OAuth2Client();
 
   let payload;
   try {
     const ticket = await googleClient.verifyIdToken({
-      idToken,
-      audience: googleClientId
+      idToken: trimmedToken,
+      audience: googleClientIds
     });
     payload = ticket.getPayload();
-  } catch {
-    throw new AppError("Invalid Google token", 401);
+    if (process.env.NODE_ENV !== "production") {
+      console.info("[auth][google] payload verified:", {
+        aud: payload?.aud,
+        iss: payload?.iss,
+        email: payload?.email,
+        emailVerified: payload?.email_verified
+      });
+    }
+  } catch (error) {
+    if (process.env.NODE_ENV !== "production") {
+      console.error("[auth][google] verifyIdToken failed:", error?.message || error);
+    }
+    throw new AppError(`Invalid Google token: ${error?.message || "Verification failed"}`, 401);
   }
 
   const email = payload?.email?.toLowerCase();
