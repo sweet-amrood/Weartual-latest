@@ -107,7 +107,9 @@ export const googleAuthService = async ({ idToken }) => {
   }
 
   let user = await User.findOne({ email });
+  let isNewUser = false;
   if (!user) {
+    isNewUser = true;
     const username = await buildUniqueUsername(payload?.name || email.split("@")[0]);
     const randomPassword = crypto.randomBytes(24).toString("hex");
     user = await User.create({
@@ -118,7 +120,7 @@ export const googleAuthService = async ({ idToken }) => {
   }
 
   const token = signJwt({ userId: user._id });
-  return { token, user: sanitizeUser(user) };
+  return { token, user: sanitizeUser(user), isNewUser };
 };
 
 export const forgotPasswordService = async (email) => {

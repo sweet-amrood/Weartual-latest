@@ -23,22 +23,34 @@ const dispatchEmailSafely = async ({ to, subject, html, context }) => {
   }
 };
 
-export const signup = asyncHandler(async (req, res) => {
-  const { token, user } = await signupService(req.body);
-
-  const welcomeHtml = `
+const buildWelcomeEmailHtml = (username) => `
     <div style="font-family: Arial, sans-serif; line-height: 1.6;">
       <h2>Welcome to Weartual</h2>
-      <p>Hi ${user.username},</p>
+      <p>Hi ${username},</p>
       <p>Your account has been created successfully. We are excited to have you with us.</p>
       <p>Start exploring Weartual and enjoy your experience.</p>
     </div>
   `;
 
+const buildLoginAlertEmailHtml = (username) => {
+  const loginTime = new Date().toISOString();
+  return `
+    <div style="font-family: Arial, sans-serif; line-height: 1.6;">
+      <h2>New login detected</h2>
+      <p>Hi ${username},</p>
+      <p>You just logged into your account.</p>
+      <p><strong>Time:</strong> ${loginTime}</p>
+    </div>
+  `;
+};
+
+export const signup = asyncHandler(async (req, res) => {
+  const { token, user } = await signupService(req.body);
+
   await dispatchEmailSafely({
     to: user.email,
     subject: "Welcome to Weartual",
-    html: welcomeHtml,
+    html: buildWelcomeEmailHtml(user.username),
     context: "signup"
   });
 
@@ -54,20 +66,10 @@ export const signup = asyncHandler(async (req, res) => {
 export const login = asyncHandler(async (req, res) => {
   const { token, user } = await loginService(req.body);
 
-  const loginTime = new Date().toISOString();
-  const loginAlertHtml = `
-    <div style="font-family: Arial, sans-serif; line-height: 1.6;">
-      <h2>New login detected</h2>
-      <p>Hi ${user.username},</p>
-      <p>You just logged into your account.</p>
-      <p><strong>Time:</strong> ${loginTime}</p>
-    </div>
-  `;
-
   await dispatchEmailSafely({
     to: user.email,
     subject: "New login detected",
-    html: loginAlertHtml,
+    html: buildLoginAlertEmailHtml(user.username),
     context: "login"
   });
 
@@ -82,7 +84,24 @@ export const login = asyncHandler(async (req, res) => {
 
 export const googleAuth = asyncHandler(async (req, res) => {
   const incomingToken = req.body?.token || req.body?.idToken;
-  const { token, user } = await googleAuthService({ idToken: incomingToken });
+  const { token, user, isNewUser } = await googleAuthService({ idToken: incomingToken });
+
+  if (isNewUser) {
+    await dispatchEmailSafely({
+      to: user.email,
+      subject: "Welcome to Weartual",
+      html: buildWelcomeEmailHtml(user.username),
+      context: "google-signup"
+    });
+  } else {
+    await dispatchEmailSafely({
+      to: user.email,
+      subject: "New login detected",
+      html: buildLoginAlertEmailHtml(user.username),
+      context: "google-login"
+    });
+  }
+
   res.cookie("token", token, cookieOptions);
 
   res.status(200).json({
