@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Clock3, History, Sparkles } from "lucide-react";
-import { getAuthenticatedUserId, getOutfitHistory } from "../services/outfitHistory";
+import { Clock3, History, Sparkles, ThumbsDown, ThumbsUp, Star } from "lucide-react";
+import { getAuthenticatedUserId, getOutfitHistory, getOutfitRatings } from "../services/outfitHistory";
 
 const formatTimestamp = (iso) => {
   if (!iso) return "Unknown time";
@@ -12,9 +12,17 @@ const formatTimestamp = (iso) => {
 export default function OutfitHistory({ user }) {
   const userId = useMemo(() => getAuthenticatedUserId(user), [user]);
   const [items, setItems] = useState([]);
+  const [ratingsByOutfitId, setRatingsByOutfitId] = useState({});
 
   useEffect(() => {
     setItems(getOutfitHistory(userId));
+    const ratings = getOutfitRatings(userId);
+    setRatingsByOutfitId(
+      ratings.reduce((acc, item) => {
+        if (item?.outfitId) acc[item.outfitId] = item;
+        return acc;
+      }, {})
+    );
   }, [userId]);
 
   if (!user) {
@@ -61,6 +69,29 @@ export default function OutfitHistory({ user }) {
                     <Clock3 className="w-3.5 h-3.5" />
                     {formatTimestamp(entry.timestamp)}
                   </p>
+                  {(() => {
+                    const rating = entry?.outfitId ? ratingsByOutfitId[entry.outfitId] : null;
+                    if (!rating) return null;
+                    return (
+                      <div className="mt-3 flex items-center gap-2 text-xs">
+                        {rating.rating === "like" && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 text-emerald-700 px-2 py-1 border border-emerald-200">
+                            <ThumbsUp className="w-3.5 h-3.5" /> Liked
+                          </span>
+                        )}
+                        {rating.rating === "dislike" && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 text-rose-700 px-2 py-1 border border-rose-200">
+                            <ThumbsDown className="w-3.5 h-3.5" /> Disliked
+                          </span>
+                        )}
+                        {Number.isInteger(rating.stars) && rating.stars > 0 && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 text-amber-700 px-2 py-1 border border-amber-200">
+                            <Star className="w-3.5 h-3.5 fill-current" /> {rating.stars}/5
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
               </article>
             ))}
