@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { logout as logoutRequest } from "../services/authApi";
-import { LogOut, Home, Info, Mail, Menu, X, Sparkles } from "lucide-react";
+import { LogOut, Home, Info, Mail, Menu, X, Sparkles, History } from "lucide-react";
 
 export default function Navbar({ user, onLogout }) {
   const navigate = useNavigate();
@@ -103,6 +103,14 @@ export default function Navbar({ user, onLogout }) {
                     </>
                   )}
                 </NavLink>
+                <NavLink to="/history" className={navLinkClass}>
+                  {({ isActive }) => (
+                    <>
+                      <span className="flex items-center gap-1.5"><History className="w-4 h-4" /> Outfit History</span>
+                      {navLinkIndicator(isActive)}
+                    </>
+                  )}
+                </NavLink>
                 <NavLink to="/contact" className={navLinkClass}>
                   {({ isActive }) => (
                     <>
@@ -172,6 +180,12 @@ export default function Navbar({ user, onLogout }) {
                 className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
               >
                 <Mail className="w-4 h-4" /> Contact
+              </NavLink>
+              <NavLink
+                to="/history"
+                className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
+              >
+                <History className="w-4 h-4" /> Outfit History
               </NavLink>
             </div>
 

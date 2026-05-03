@@ -2,12 +2,13 @@ import React, { useMemo, useRef, useState, useEffect } from "react";
 import { listDatasetSamples, uploadMyImage } from "../services/imageApi";
 import { Sparkles, Trash2, Download, ArrowRight } from "lucide-react";
 import StyleInsightsPanel from "../components/StyleInsightsPanel";
+import { addOutfitHistoryEntry, getAuthenticatedUserId } from "../services/outfitHistory";
 
 const VALID_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const MAX_BYTES = 10 * 1024 * 1024;
 const AI_PROGRESS_STAGES = ["Detecting pose...", "Applying cloth...", "Refining output..."];
 
-export default function TryOnStudio() {
+export default function TryOnStudio({ user }) {
   const [personFile, setPersonFile] = useState(null);
   const [garmentFile, setGarmentFile] = useState(null);
   const [personPreview, setPersonPreview] = useState(null);
@@ -222,6 +223,11 @@ export default function TryOnStudio() {
       setComparePosition(50);
       setResultImage(job.resultUrl);
       setResultFilename(job.resultFilename || "weartual-sys-output.jpg");
+      addOutfitHistoryEntry(getAuthenticatedUserId(user), {
+        image: job.resultUrl,
+        timestamp: new Date().toISOString(),
+        name: garmentFile?.name ? `Try-on: ${garmentFile.name}` : "Generated outfit look"
+      });
     } catch (err) {
       setStatus("error");
       setError(err?.message || "Try-on generation failed.");

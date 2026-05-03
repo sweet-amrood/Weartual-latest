@@ -8,6 +8,7 @@ import LandingPage from './pages/LandingPage'
 import TryOnStudio from './pages/TryOnStudio'
 import AboutUs from './pages/AboutUs'
 import Contact from './pages/Contact'
+import OutfitHistory from './pages/OutfitHistory'
 import { getMe } from './services/authApi'
 
 export default function App() {
@@ -15,11 +16,11 @@ export default function App() {
   const [authLoading, setAuthLoading] = useState(true);
 
   const handleLogin = (userData) => {
-    setUser({ ...userData, uid: Math.random().toString(36).substr(2, 9) });
+    setUser(userData);
   };
 
   const handleSignup = (userData) => {
-    setUser({ ...userData, uid: Math.random().toString(36).substr(2, 9) });
+    setUser(userData);
   };
 
   const handleLogout = () => {
@@ -53,7 +54,8 @@ export default function App() {
       <Navbar user={user} onLogout={handleLogout} />
       <Routes>
         <Route path="/" element={<LandingPage />} />
-        <Route path="/studio" element={<TryOnStudio />} />
+        <Route path="/studio" element={<TryOnStudio user={user} />} />
+        <Route path="/history" element={<OutfitHistory user={user} />} />
         <Route path="/about" element={<AboutUs />} />
         <Route path="/contact" element={<Contact />} />
         <Route
