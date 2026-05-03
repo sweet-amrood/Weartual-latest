@@ -22,7 +22,11 @@ export default function TryOnStudio() {
   const [activeStageIndex, setActiveStageIndex] = useState(0);
   const [stageVisible, setStageVisible] = useState(true);
   const [scanOffset, setScanOffset] = useState(-20);
+  const [comparePosition, setComparePosition] = useState(50);
+  const [compareImageWidth, setCompareImageWidth] = useState(0);
+  const [resultAspectRatio, setResultAspectRatio] = useState(null);
   const heroTargetRef = useRef({ x: 50, y: 50 });
+  const compareRef = useRef(null);
 
   const personInputRef = useRef(null);
   const garmentInputRef = useRef(null);
@@ -129,6 +133,32 @@ export default function TryOnStudio() {
     return () => window.cancelAnimationFrame(frameId);
   }, [isProcessing]);
 
+  useEffect(() => {
+    const resize = () => {
+      if (!compareRef.current) return;
+      setCompareImageWidth(compareRef.current.getBoundingClientRect().width);
+    };
+    resize();
+    window.addEventListener("resize", resize);
+    return () => window.removeEventListener("resize", resize);
+  }, [status, resultImage, garmentPreview]);
+
+  useEffect(() => {
+    if (!resultImage) {
+      setResultAspectRatio(null);
+      return undefined;
+    }
+
+    const img = new Image();
+    img.onload = () => {
+      if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+        setResultAspectRatio(img.naturalWidth / img.naturalHeight);
+      }
+    };
+    img.src = resultImage;
+    return undefined;
+  }, [resultImage]);
+
   const handleHeroMouseMove = (e) => {
     const rect = e.currentTarget.getBoundingClientRect();
     heroTargetRef.current = {
@@ -188,6 +218,7 @@ export default function TryOnStudio() {
       const job = response?.job;
       if (!job?.resultUrl) throw new Error("Result image URL was not generated");
       setStatus("success");
+      setComparePosition(50);
       setResultImage(job.resultUrl);
       setResultFilename(job.resultFilename || "weartual-sys-output.jpg");
     } catch (err) {
@@ -324,7 +355,11 @@ export default function TryOnStudio() {
           </div>
 
           <div className="lg:col-span-7">
-            <div className="rounded-3xl border border-slate-200 bg-white p-3 shadow-xl h-full flex flex-col">
+            <div
+              className={`rounded-3xl border border-slate-200 bg-white p-3 shadow-xl flex flex-col ${
+                status === "success" && resultImage ? "h-auto" : "h-full"
+              }`}
+            >
               <div className="flex items-center justify-between px-1 pb-2">
                 <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-500">Result Preview</h3>
                 {status === "success" && resultImage && (
@@ -343,7 +378,11 @@ export default function TryOnStudio() {
                   </button>
                 )}
               </div>
-              <div className="flex-1 rounded-2xl bg-slate-100 overflow-hidden min-h-[320px] lg:min-h-0">
+              <div
+                className={`rounded-2xl bg-slate-100 overflow-hidden ${
+                  isProcessing ? "h-full min-h-[320px] lg:min-h-0" : status === "success" && resultImage ? "" : "min-h-[320px]"
+                }`}
+              >
                 {isProcessing ? (
                   <div className="w-full h-full flex items-center justify-center p-6 bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-900">
                     <div className="w-full max-w-md rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl p-8 text-center shadow-2xl relative overflow-hidden">
@@ -370,6 +409,48 @@ export default function TryOnStudio() {
                       >
                         {AI_PROGRESS_STAGES[activeStageIndex]}
                       </p>
+                    </div>
+                  </div>
+                ) : status === "success" && resultImage && personPreview && garmentPreview ? (
+                  <div
+                    ref={compareRef}
+                    className="relative w-full overflow-hidden bg-black select-none"
+                    style={resultAspectRatio ? { aspectRatio: `${resultAspectRatio}` } : undefined}
+                  >
+                    <img src={garmentPreview} alt="Cloth preview" className="block w-full h-auto" draggable={false} />
+                    <div className="absolute inset-y-0 left-0 overflow-hidden" style={{ width: `${comparePosition}%` }}>
+                      <img
+                        src={personPreview}
+                        alt="Original uploaded"
+                        className="h-full max-w-none object-cover"
+                        style={{ width: `${compareImageWidth}px` }}
+                        draggable={false}
+                      />
+                    </div>
+
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      step="0.1"
+                      value={comparePosition}
+                      onChange={(e) => setComparePosition(Number(e.target.value))}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-ew-resize z-20"
+                      aria-label="Compare before and after"
+                    />
+
+                    <div className="absolute inset-y-0 z-10 pointer-events-none" style={{ left: `${comparePosition}%`, transform: "translateX(-50%)" }}>
+                      <div className="h-full w-0.5 bg-white/90 shadow-[0_0_0_1px_rgba(0,0,0,0.08)]" />
+                      <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-8 h-8 rounded-full bg-brand-600 text-white flex items-center justify-center shadow-lg">
+                        <span className="text-xs font-bold">||</span>
+                      </div>
+                    </div>
+
+                    <div className="absolute top-3 left-3 text-[10px] font-semibold uppercase tracking-wider px-2 py-1 rounded-full bg-slate-900/70 text-white">
+                      Before
+                    </div>
+                    <div className="absolute top-3 right-3 text-[10px] font-semibold uppercase tracking-wider px-2 py-1 rounded-full bg-brand-600/90 text-white">
+                      Cloth
                     </div>
                   </div>
                 ) : status === "success" && resultImage ? (
