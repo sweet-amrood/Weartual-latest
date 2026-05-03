@@ -7,21 +7,8 @@ import {
   resetPasswordService,
   signupService
 } from "../services/auth.service.js";
-import { sendEmail } from "../config/email.js";
 import { cookieOptions } from "../utils/token.js";
-
-const EMAIL_TIMEOUT_MS = 5000;
-
-const dispatchEmailSafely = async ({ to, subject, html, context }) => {
-  try {
-    await Promise.race([
-      sendEmail(to, subject, html),
-      new Promise((resolve) => setTimeout(resolve, EMAIL_TIMEOUT_MS))
-    ]);
-  } catch (error) {
-    console.error(`[auth][${context}] Email dispatch failed:`, error);
-  }
-};
+import { dispatchEmailSafely } from "../utils/dispatchEmail.js";
 
 const buildWelcomeEmailHtml = (username) => `
     <div style="font-family: Arial, sans-serif; line-height: 1.6;">
@@ -51,7 +38,7 @@ export const signup = asyncHandler(async (req, res) => {
     to: user.email,
     subject: "Welcome to Weartual",
     html: buildWelcomeEmailHtml(user.username),
-    context: "signup"
+    context: "auth-signup"
   });
 
   res.cookie("token", token, cookieOptions);
@@ -70,7 +57,7 @@ export const login = asyncHandler(async (req, res) => {
     to: user.email,
     subject: "New login detected",
     html: buildLoginAlertEmailHtml(user.username),
-    context: "login"
+    context: "auth-login"
   });
 
   res.cookie("token", token, cookieOptions);
@@ -91,14 +78,14 @@ export const googleAuth = asyncHandler(async (req, res) => {
       to: user.email,
       subject: "Welcome to Weartual",
       html: buildWelcomeEmailHtml(user.username),
-      context: "google-signup"
+      context: "auth-google-signup"
     });
   } else {
     await dispatchEmailSafely({
       to: user.email,
       subject: "New login detected",
       html: buildLoginAlertEmailHtml(user.username),
-      context: "google-login"
+      context: "auth-google-login"
     });
   }
 

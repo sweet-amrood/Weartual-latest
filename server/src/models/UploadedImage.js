@@ -1,5 +1,7 @@
 import mongoose from "mongoose";
 
+const IMAGE_JOB_STATUSES = ["pending", "processing", "done", "failed"];
+
 const uploadedImageSchema = new mongoose.Schema(
   {
     userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true, index: true },
@@ -7,6 +9,14 @@ const uploadedImageSchema = new mongoose.Schema(
     garmentFilename: { type: String, required: true },
     imageUrl: { type: String, required: true },
     garmentUrl: { type: String, required: true },
+    status: {
+      type: String,
+      enum: IMAGE_JOB_STATUSES,
+      default: "pending",
+      index: true
+    },
+    processedAt: { type: Date, default: null },
+    error: { type: String, default: null },
     resultUrl: { type: String, default: null },
     resultFilename: { type: String, default: null },
     stableVitonBundle: {

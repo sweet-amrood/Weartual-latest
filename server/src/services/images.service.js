@@ -38,6 +38,9 @@ const toClientImage = (doc) => ({
   garmentFilename: doc.garmentFilename,
   imageUrl: doc.imageUrl,
   garmentUrl: doc.garmentUrl,
+  status: doc.status,
+  processedAt: doc.processedAt,
+  error: doc.error,
   resultUrl: doc.resultUrl,
   resultFilename: doc.resultFilename,
   stableVitonBundle: doc.stableVitonBundle,
@@ -222,47 +225,68 @@ export const uploadImageService = async ({ userId, imageFile, garmentFile }) => 
     writeBufferWithOriginalName("garment", garmentName, garmentFile.buffer)
   ]);
 
-  const [imageUpload, garmentUpload] = await Promise.all([
-    uploadBufferToCloudinary(imageFile.buffer, "uploads/image", imageName),
-    uploadBufferToCloudinary(garmentFile.buffer, "uploads/garment", garmentName)
-  ]);
+  try {
+    const [imageUpload, garmentUpload] = await Promise.all([
+      uploadBufferToCloudinary(imageFile.buffer, "uploads/image", imageName),
+      uploadBufferToCloudinary(garmentFile.buffer, "uploads/garment", garmentName)
+    ]);
 
-  const imageUrl = imageUpload?.secure_url;
-  const garmentUrl = garmentUpload?.secure_url;
+    const imageUrl = imageUpload?.secure_url;
+    const garmentUrl = garmentUpload?.secure_url;
 
-  if (!imageUrl || !garmentUrl) {
-    throw new AppError("Cloudinary upload failed to return secure URLs", 500);
+    if (!imageUrl || !garmentUrl) {
+      throw new AppError("Cloudinary upload failed to return secure URLs", 500);
+    }
+
+    console.info("[images] Uploaded to Cloudinary", {
+      userId: String(userId),
+      imageUrl,
+      garmentUrl
+    });
+
+    const stableVitonBundle = await buildStableVitonInputBundle({
+      personPrefix,
+      clothPrefix,
+      cloudRootFolder: `uploads/stableviton/${userId}/${Date.now()}`
+    });
+
+    const hasPersonDatasetAssets = (stableVitonBundle.assets?.image || []).length > 0;
+    const hasClothDatasetAssets = (stableVitonBundle.assets?.cloth || []).length > 0;
+    if (!hasPersonDatasetAssets || !hasClothDatasetAssets) {
+      throw new AppError(
+        "Could not find matching dataset assets for the uploaded file names. Use dataset-style names (e.g. 00011_00) or choose sample images.",
+        400
+      );
+    }
+
+    const { resultUrl, resultFilename } = await createMockResultAndUpload(imageFile);
+
+    const job = await UploadedImage.create({
+      userId,
+      imageFilename: imageName,
+      garmentFilename: garmentName,
+      imageUrl,
+      garmentUrl,
+      status: "pending",
+      processedAt: null,
+      error: null,
+      resultUrl,
+      resultFilename,
+      stableVitonBundle
+    });
+
+    console.info("[images] Job created (pending)", {
+      jobId: String(job._id),
+      userId: String(userId),
+      status: job.status
+    });
+
+    return toClientImage(job);
+  } catch (error) {
+    if (error instanceof AppError) throw error;
+    console.error("[images][cloudinary] Upload pipeline failed:", error?.message || error);
+    throw new AppError("Cloudinary upload failed", 502);
   }
-
-  const stableVitonBundle = await buildStableVitonInputBundle({
-    personPrefix,
-    clothPrefix,
-    cloudRootFolder: `uploads/stableviton/${userId}/${Date.now()}`
-  });
-
-  const hasPersonDatasetAssets = (stableVitonBundle.assets?.image || []).length > 0;
-  const hasClothDatasetAssets = (stableVitonBundle.assets?.cloth || []).length > 0;
-  if (!hasPersonDatasetAssets || !hasClothDatasetAssets) {
-    throw new AppError(
-      "Could not find matching dataset assets for the uploaded file names. Use dataset-style names (e.g. 00011_00) or choose sample images.",
-      400
-    );
-  }
-
-  const { resultUrl, resultFilename } = await createMockResultAndUpload(imageFile);
-
-  const job = await UploadedImage.create({
-    userId,
-    imageFilename: imageName,
-    garmentFilename: garmentName,
-    imageUrl,
-    garmentUrl,
-    resultUrl,
-    resultFilename,
-    stableVitonBundle
-  });
-
-  return toClientImage(job);
 };
 
 export const listMyImagesService = async (userId) => {
