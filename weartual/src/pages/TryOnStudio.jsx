@@ -1,6 +1,6 @@
 import React, { useMemo, useRef, useState, useEffect } from "react";
 import { listDatasetSamples, uploadMyImage } from "../services/imageApi";
-import { Sparkles, Trash2, Download, ArrowRight, ThumbsUp, ThumbsDown, Star } from "lucide-react";
+import { Sparkles, Trash2, Download, ArrowRight, ThumbsUp, ThumbsDown, Star, MessageCircle, Music2, Link2, Share2, Send } from "lucide-react";
 import StyleInsightsPanel from "../components/StyleInsightsPanel";
 import { addOutfitHistoryEntry, getAuthenticatedUserId, getOutfitRating, saveOutfitRating } from "../services/outfitHistory";
 
@@ -52,6 +52,7 @@ export default function TryOnStudio({ user }) {
   const [animatedRating, setAnimatedRating] = useState(null);
   const [ratingLocked, setRatingLocked] = useState(false);
   const [improvementSuggestions, setImprovementSuggestions] = useState([]);
+  const [shareFeedback, setShareFeedback] = useState("");
   const heroTargetRef = useRef({ x: 50, y: 50 });
   const compareRef = useRef(null);
 
@@ -358,6 +359,60 @@ export default function TryOnStudio({ user }) {
     }
   };
 
+  const downloadCurrentResult = () => {
+    if (!resultImage) return;
+    const a = document.createElement("a");
+    a.href = resultImage;
+    a.download = resultFilename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
+  const copyImageLink = async () => {
+    if (!resultImage) return false;
+    try {
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(resultImage);
+        setShareFeedback("Image link copied.");
+        window.setTimeout(() => setShareFeedback(""), 1800);
+        return true;
+      }
+      return false;
+    } catch {
+      return false;
+    }
+  };
+
+  const openShareUrl = (url) => {
+    window.open(url, "_blank", "noopener,noreferrer");
+  };
+
+  const handleSocialShare = async (platform) => {
+    if (!resultImage) return;
+    const encodedUrl = encodeURIComponent(resultImage);
+    const message = encodeURIComponent("Check out my AI try-on look!");
+
+    if (platform === "facebook") {
+      openShareUrl(`https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}`);
+      return;
+    }
+    if (platform === "twitter") {
+      openShareUrl(`https://twitter.com/intent/tweet?text=${message}&url=${encodedUrl}`);
+      return;
+    }
+    if (platform === "whatsapp") {
+      openShareUrl(`https://api.whatsapp.com/send?text=${message}%20${encodedUrl}`);
+      return;
+    }
+
+    // TikTok web share is limited: fallback to copy link, then download.
+    const copied = await copyImageLink();
+    if (!copied) downloadCurrentResult();
+    setShareFeedback(copied ? "TikTok fallback: link copied." : "TikTok fallback: image downloaded.");
+    window.setTimeout(() => setShareFeedback(""), 2000);
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
       <div className="max-w-6xl mx-auto px-4 py-12">
@@ -477,24 +532,63 @@ export default function TryOnStudio({ user }) {
                 status === "success" && resultImage ? "h-auto" : "h-full"
               }`}
             >
-              <div className="flex items-center justify-between px-1 pb-2">
+              <div className="flex flex-wrap items-center justify-between gap-2 px-1 pb-2">
                 <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-500">Result Preview</h3>
                 {status === "success" && resultImage && (
-                  <button
-                    onClick={() => {
-                      const a = document.createElement("a");
-                      a.href = resultImage;
-                      a.download = resultFilename;
-                      document.body.appendChild(a);
-                      a.click();
-                      document.body.removeChild(a);
-                    }}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand-600 text-white text-xs font-semibold hover:bg-brand-500"
-                  >
-                    <Download className="w-3.5 h-3.5" /> Download
-                  </button>
+                  <div className="flex flex-wrap items-center justify-end gap-2 w-full sm:w-auto">
+                    <button
+                      type="button"
+                      onClick={downloadCurrentResult}
+                      className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg bg-brand-600 text-white text-xs font-semibold hover:bg-brand-500 transition-colors"
+                    >
+                      <Download className="w-3.5 h-3.5" /> Download Image
+                    </button>
+                    <div className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-1 py-1">
+                      <button
+                        type="button"
+                        onClick={() => handleSocialShare("facebook")}
+                        className="p-1.5 rounded-md text-slate-600 hover:text-blue-600 hover:bg-blue-50 transition-all"
+                        aria-label="Share on Facebook"
+                      >
+                        <Share2 className="w-4 h-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleSocialShare("whatsapp")}
+                        className="p-1.5 rounded-md text-slate-600 hover:text-emerald-600 hover:bg-emerald-50 transition-all"
+                        aria-label="Share on WhatsApp"
+                      >
+                        <MessageCircle className="w-4 h-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleSocialShare("twitter")}
+                        className="p-1.5 rounded-md text-slate-600 hover:text-sky-600 hover:bg-sky-50 transition-all"
+                        aria-label="Share on Twitter"
+                      >
+                        <Send className="w-4 h-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleSocialShare("tiktok")}
+                        className="p-1.5 rounded-md text-slate-600 hover:text-violet-600 hover:bg-violet-50 transition-all"
+                        aria-label="Share on TikTok"
+                      >
+                        <Music2 className="w-4 h-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={copyImageLink}
+                        className="p-1.5 rounded-md text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-all"
+                        aria-label="Copy image link"
+                      >
+                        <Link2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
                 )}
               </div>
+              {shareFeedback && <p className="px-1 pb-2 text-xs text-slate-500">{shareFeedback}</p>}
               <div
                 className={`rounded-2xl bg-slate-100 overflow-hidden ${
                   isProcessing ? "h-full min-h-[320px] lg:min-h-0" : status === "success" && resultImage ? "" : "min-h-[320px]"
