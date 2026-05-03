@@ -1,8 +1,8 @@
 import React, { useMemo, useRef, useState, useEffect } from "react";
 import { listDatasetSamples, uploadMyImage } from "../services/imageApi";
-import { Sparkles, Trash2, Download, ArrowRight } from "lucide-react";
+import { Sparkles, Trash2, Download, ArrowRight, ThumbsUp, ThumbsDown, Star } from "lucide-react";
 import StyleInsightsPanel from "../components/StyleInsightsPanel";
-import { addOutfitHistoryEntry, getAuthenticatedUserId } from "../services/outfitHistory";
+import { addOutfitHistoryEntry, getAuthenticatedUserId, getOutfitRating, saveOutfitRating } from "../services/outfitHistory";
 
 const VALID_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const MAX_BYTES = 10 * 1024 * 1024;
@@ -27,6 +27,11 @@ export default function TryOnStudio({ user }) {
   const [comparePosition, setComparePosition] = useState(50);
   const [compareImageWidth, setCompareImageWidth] = useState(0);
   const [resultAspectRatio, setResultAspectRatio] = useState(null);
+  const [currentOutfitId, setCurrentOutfitId] = useState(null);
+  const [selectedRating, setSelectedRating] = useState(null);
+  const [selectedStars, setSelectedStars] = useState(0);
+  const [animatedRating, setAnimatedRating] = useState(null);
+  const [ratingLocked, setRatingLocked] = useState(false);
   const heroTargetRef = useRef({ x: 50, y: 50 });
   const compareRef = useRef(null);
 
@@ -161,6 +166,19 @@ export default function TryOnStudio({ user }) {
     return undefined;
   }, [resultImage]);
 
+  useEffect(() => {
+    if (!currentOutfitId) {
+      setSelectedRating(null);
+      setSelectedStars(0);
+      setRatingLocked(false);
+      return;
+    }
+    const existing = getOutfitRating(getAuthenticatedUserId(user), currentOutfitId);
+    setSelectedRating(existing?.rating || null);
+    setSelectedStars(existing?.stars || 0);
+    setRatingLocked(!!existing);
+  }, [currentOutfitId, user]);
+
   const handleHeroMouseMove = (e) => {
     const rect = e.currentTarget.getBoundingClientRect();
     heroTargetRef.current = {
@@ -219,13 +237,19 @@ export default function TryOnStudio({ user }) {
       const response = await uploadMyImage({ imageFile: personFile, garmentFile });
       const job = response?.job;
       if (!job?.resultUrl) throw new Error("Result image URL was not generated");
+      const outfitId = new Date().toISOString();
       setStatus("success");
       setComparePosition(50);
       setResultImage(job.resultUrl);
       setResultFilename(job.resultFilename || "weartual-sys-output.jpg");
+      setCurrentOutfitId(outfitId);
+      setSelectedRating(null);
+      setSelectedStars(0);
+      setRatingLocked(false);
       addOutfitHistoryEntry(getAuthenticatedUserId(user), {
         image: job.resultUrl,
-        timestamp: new Date().toISOString(),
+        timestamp: outfitId,
+        outfitId,
         name: garmentFile?.name ? `Try-on: ${garmentFile.name}` : "Generated outfit look"
       });
     } catch (err) {
@@ -246,6 +270,38 @@ export default function TryOnStudio({ user }) {
       setGarmentFile(null);
       if (garmentInputRef.current) garmentInputRef.current.value = "";
     }
+  };
+
+  const rateOutfit = (rating) => {
+    if (!currentOutfitId || ratingLocked) return;
+    const userId = getAuthenticatedUserId(user);
+    const result = saveOutfitRating({
+      userId,
+      outfitId: currentOutfitId,
+      rating,
+      stars: selectedStars || undefined,
+      allowUpdate: true
+    });
+    if (!result.saved) return;
+    setSelectedRating(rating);
+    setAnimatedRating(rating);
+    window.setTimeout(() => setAnimatedRating(null), 220);
+  };
+
+  const rateStars = (stars) => {
+    if (!currentOutfitId || ratingLocked) return;
+    const userId = getAuthenticatedUserId(user);
+    const result = saveOutfitRating({
+      userId,
+      outfitId: currentOutfitId,
+      stars,
+      rating: selectedRating || undefined,
+      allowUpdate: true
+    });
+    if (!result.saved) return;
+    setSelectedStars(stars);
+    setAnimatedRating("stars");
+    window.setTimeout(() => setAnimatedRating(null), 220);
   };
 
   return (
@@ -468,6 +524,53 @@ export default function TryOnStudio({ user }) {
                   </div>
                 )}
               </div>
+              {status === "success" && resultImage && (
+                <div className="pt-3 flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => rateOutfit("like")}
+                    disabled={ratingLocked}
+                    className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium transition-all duration-200 ${
+                      selectedRating === "like"
+                        ? "bg-emerald-50 text-emerald-700 border-emerald-300"
+                        : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+                    } ${animatedRating === "like" ? "scale-105" : "scale-100"} ${ratingLocked ? "cursor-not-allowed opacity-90" : ""}`}
+                  >
+                    <ThumbsUp className="w-4 h-4" /> Like
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => rateOutfit("dislike")}
+                    disabled={ratingLocked}
+                    className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium transition-all duration-200 ${
+                      selectedRating === "dislike"
+                        ? "bg-rose-50 text-rose-700 border-rose-300"
+                        : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+                    } ${animatedRating === "dislike" ? "scale-105" : "scale-100"} ${ratingLocked ? "cursor-not-allowed opacity-90" : ""}`}
+                  >
+                    <ThumbsDown className="w-4 h-4" /> Dislike
+                  </button>
+                  <div className={`ml-1 inline-flex items-center rounded-lg border border-slate-200 bg-white px-2 py-1.5 ${animatedRating === "stars" ? "scale-105" : "scale-100"} transition-all duration-200`}>
+                    {Array.from({ length: 5 }).map((_, idx) => {
+                      const star = idx + 1;
+                      const active = selectedStars >= star;
+                      return (
+                        <button
+                          key={star}
+                          type="button"
+                          onClick={() => rateStars(star)}
+                          disabled={ratingLocked}
+                          className={`p-1 transition-colors ${ratingLocked ? "cursor-not-allowed" : "hover:scale-105"} ${active ? "text-amber-400" : "text-slate-300 hover:text-amber-300"}`}
+                          aria-label={`Rate ${star} star${star > 1 ? "s" : ""}`}
+                        >
+                          <Star className={`w-4 h-4 ${active ? "fill-current" : ""}`} />
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {ratingLocked && <p className="text-xs text-slate-500">Rating locked for this saved outfit.</p>}
+                </div>
+              )}
             </div>
             {status === "success" && resultImage && <StyleInsightsPanel personImageUrl={personPreview} clothImageUrl={garmentPreview} />}
           </div>
