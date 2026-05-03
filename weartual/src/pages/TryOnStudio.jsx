@@ -7,6 +7,25 @@ import { addOutfitHistoryEntry, getAuthenticatedUserId, getOutfitRating, saveOut
 const VALID_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const MAX_BYTES = 10 * 1024 * 1024;
 const AI_PROGRESS_STAGES = ["Detecting pose...", "Applying cloth...", "Refining output..."];
+const LOCAL_CLOTH_DATASET = [
+  "/dataset/cloth/00001_00.jpg",
+  "/dataset/cloth/00002_00.jpg",
+  "/dataset/cloth/00003_00.jpg",
+  "/dataset/cloth/00004_00.jpg",
+  "/dataset/cloth/00005_00.jpg",
+  "/dataset/cloth/00006_00.jpg",
+  "/dataset/cloth/00007_00.jpg",
+  "/dataset/cloth/00008_00.jpg"
+];
+
+const pickRandomItems = (items, count = 4) => {
+  const source = [...items];
+  for (let i = source.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [source[i], source[j]] = [source[j], source[i]];
+  }
+  return source.slice(0, count);
+};
 
 export default function TryOnStudio({ user }) {
   const [personFile, setPersonFile] = useState(null);
@@ -32,6 +51,7 @@ export default function TryOnStudio({ user }) {
   const [selectedStars, setSelectedStars] = useState(0);
   const [animatedRating, setAnimatedRating] = useState(null);
   const [ratingLocked, setRatingLocked] = useState(false);
+  const [improvementSuggestions, setImprovementSuggestions] = useState([]);
   const heroTargetRef = useRef({ x: 50, y: 50 });
   const compareRef = useRef(null);
 
@@ -179,6 +199,13 @@ export default function TryOnStudio({ user }) {
     setRatingLocked(!!existing);
   }, [currentOutfitId, user]);
 
+  useEffect(() => {
+    const candidateSuggestions = clothSamples.length
+      ? clothSamples.map((sample) => ({ url: sample.url, name: sample.fileName || "Suggested cloth" }))
+      : LOCAL_CLOTH_DATASET.map((url, idx) => ({ url, name: `Cloth ${idx + 1}` }));
+    setImprovementSuggestions(pickRandomItems(candidateSuggestions, 4));
+  }, [clothSamples]);
+
   const handleHeroMouseMove = (e) => {
     const rect = e.currentTarget.getBoundingClientRect();
     heroTargetRef.current = {
@@ -227,14 +254,14 @@ export default function TryOnStudio({ user }) {
     }
   };
 
-  const runTryOn = async () => {
-    if (!personFile || !garmentFile) return setError("Upload both person and garment images first.");
+  const executeTryOn = async ({ person, garment }) => {
+    if (!person || !garment) return setError("Upload both person and garment images first.");
     try {
       setError("");
       setStatus("analyzing");
       setActiveStageIndex(0);
       setStageVisible(true);
-      const response = await uploadMyImage({ imageFile: personFile, garmentFile });
+      const response = await uploadMyImage({ imageFile: person, garmentFile: garment });
       const job = response?.job;
       if (!job?.resultUrl) throw new Error("Result image URL was not generated");
       const outfitId = new Date().toISOString();
@@ -250,12 +277,21 @@ export default function TryOnStudio({ user }) {
         image: job.resultUrl,
         timestamp: outfitId,
         outfitId,
-        name: garmentFile?.name ? `Try-on: ${garmentFile.name}` : "Generated outfit look"
+        name: garment?.name ? `Try-on: ${garment.name}` : "Generated outfit look"
       });
+      const candidateSuggestions = clothSamples.length
+        ? clothSamples.map((sample) => ({ url: sample.url, name: sample.fileName || "Suggested cloth" }))
+        : LOCAL_CLOTH_DATASET.map((url, idx) => ({ url, name: `Cloth ${idx + 1}` }));
+      setImprovementSuggestions(pickRandomItems(candidateSuggestions, 4));
     } catch (err) {
       setStatus("error");
       setError(err?.message || "Try-on generation failed.");
     }
+  };
+
+  const runTryOn = async () => {
+    if (!personFile || !garmentFile) return setError("Upload both person and garment images first.");
+    await executeTryOn({ person: personFile, garment: garmentFile });
   };
 
   const clearType = (type) => {
@@ -302,6 +338,24 @@ export default function TryOnStudio({ user }) {
     setSelectedStars(stars);
     setAnimatedRating("stars");
     window.setTimeout(() => setAnimatedRating(null), 220);
+  };
+
+  const handleSuggestionClick = async (suggestion) => {
+    if (!personFile || !suggestion?.url || isProcessing) return;
+    try {
+      const response = await fetch(suggestion.url);
+      const blob = await response.blob();
+      const contentType = blob.type || "image/jpeg";
+      const extension = contentType.includes("png") ? "png" : contentType.includes("webp") ? "webp" : "jpg";
+      const suggestionFile = new File([blob], suggestion.name || `suggested-cloth.${extension}`, { type: contentType });
+      if (garmentPreview) URL.revokeObjectURL(garmentPreview);
+      const nextPreview = URL.createObjectURL(suggestionFile);
+      setGarmentFile(suggestionFile);
+      setGarmentPreview(nextPreview);
+      await executeTryOn({ person: personFile, garment: suggestionFile });
+    } catch {
+      setError("Could not load suggested cloth image.");
+    }
   };
 
   return (
@@ -569,6 +623,26 @@ export default function TryOnStudio({ user }) {
                     })}
                   </div>
                   {ratingLocked && <p className="text-xs text-slate-500">Rating locked for this saved outfit.</p>}
+                </div>
+              )}
+              {status === "success" && resultImage && (
+                <div className="pt-4">
+                  <h4 className="text-sm font-semibold uppercase tracking-wider text-slate-500 mb-2">Suggested Improvements</h4>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {improvementSuggestions.map((item, idx) => (
+                      <button
+                        key={`${item.url}-${idx}`}
+                        type="button"
+                        onClick={() => handleSuggestionClick(item)}
+                        disabled={isProcessing}
+                        className="rounded-xl border border-slate-200 bg-white overflow-hidden transition-all hover:-translate-y-0.5 hover:shadow-md disabled:opacity-60"
+                      >
+                        <div className="aspect-square bg-slate-100">
+                          <img src={item.url} alt={item.name || "Suggested cloth"} className="w-full h-full object-cover" loading="lazy" />
+                        </div>
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
