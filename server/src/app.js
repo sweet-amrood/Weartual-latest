@@ -8,7 +8,10 @@ import { errorHandler, notFound } from "./middlewares/error.middleware.js";
 
 const app = express();
 
-const allowedOrigins = process.env.CLIENT_URL.split(',');
+const allowedOrigins = String(process.env.CLIENT_URL || "")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
 
 app.use(cors({
   origin: allowedOrigins,
