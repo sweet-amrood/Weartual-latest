@@ -1,6 +1,7 @@
 import React, { useMemo, useRef, useState, useEffect } from "react";
 import { listDatasetSamples, uploadMyImage } from "../services/imageApi";
 import { Sparkles, Trash2, Download, ArrowRight } from "lucide-react";
+import StyleInsightsPanel from "../components/StyleInsightsPanel";
 
 const VALID_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const MAX_BYTES = 10 * 1024 * 1024;
@@ -354,7 +355,7 @@ export default function TryOnStudio() {
             </button>
           </div>
 
-          <div className="lg:col-span-7">
+          <div className="lg:col-span-7 flex flex-col gap-4">
             <div
               className={`rounded-3xl border border-slate-200 bg-white p-3 shadow-xl flex flex-col ${
                 status === "success" && resultImage ? "h-auto" : "h-full"
@@ -411,7 +412,7 @@ export default function TryOnStudio() {
                       </p>
                     </div>
                   </div>
-                ) : status === "success" && resultImage && personPreview && garmentPreview ? (
+                ) : status === "success" && resultImage && garmentPreview ? (
                   <div
                     ref={compareRef}
                     className="relative w-full overflow-hidden bg-black select-none"
@@ -420,8 +421,8 @@ export default function TryOnStudio() {
                     <img src={garmentPreview} alt="Cloth preview" className="block w-full h-auto" draggable={false} />
                     <div className="absolute inset-y-0 left-0 overflow-hidden" style={{ width: `${comparePosition}%` }}>
                       <img
-                        src={personPreview}
-                        alt="Original uploaded"
+                        src={resultImage}
+                        alt="Generated try-on result"
                         className="h-full max-w-none object-cover"
                         style={{ width: `${compareImageWidth}px` }}
                         draggable={false}
@@ -447,10 +448,10 @@ export default function TryOnStudio() {
                     </div>
 
                     <div className="absolute top-3 left-3 text-[10px] font-semibold uppercase tracking-wider px-2 py-1 rounded-full bg-slate-900/70 text-white">
-                      Before
+                      After
                     </div>
                     <div className="absolute top-3 right-3 text-[10px] font-semibold uppercase tracking-wider px-2 py-1 rounded-full bg-brand-600/90 text-white">
-                      Cloth
+                      Before
                     </div>
                   </div>
                 ) : status === "success" && resultImage ? (
@@ -462,6 +463,7 @@ export default function TryOnStudio() {
                 )}
               </div>
             </div>
+            {status === "success" && resultImage && <StyleInsightsPanel personImageUrl={personPreview} clothImageUrl={garmentPreview} />}
           </div>
         </div>
       </div>
