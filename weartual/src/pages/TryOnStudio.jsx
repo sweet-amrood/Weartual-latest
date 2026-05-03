@@ -4,6 +4,7 @@ import { Sparkles, Trash2, Download, ArrowRight } from "lucide-react";
 
 const VALID_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const MAX_BYTES = 10 * 1024 * 1024;
+const AI_PROGRESS_STAGES = ["Detecting pose...", "Applying cloth...", "Refining output..."];
 
 export default function TryOnStudio() {
   const [personFile, setPersonFile] = useState(null);
@@ -18,11 +19,14 @@ export default function TryOnStudio() {
   const [clothSamples, setClothSamples] = useState([]);
   const [heroGlow, setHeroGlow] = useState({ x: 50, y: 50 });
   const [isTouchDevice, setIsTouchDevice] = useState(false);
+  const [activeStageIndex, setActiveStageIndex] = useState(0);
+  const [stageVisible, setStageVisible] = useState(true);
+  const [scanOffset, setScanOffset] = useState(-20);
   const heroTargetRef = useRef({ x: 50, y: 50 });
 
   const personInputRef = useRef(null);
   const garmentInputRef = useRef(null);
-  const isProcessing = useMemo(() => ["analyzing", "mapping", "synthesizing"].includes(status), [status]);
+  const isProcessing = useMemo(() => status === "analyzing", [status]);
   const canRun = !!personPreview && !!garmentPreview && !isProcessing;
 
   useEffect(() => {
@@ -86,6 +90,45 @@ export default function TryOnStudio() {
     return () => window.clearInterval(timer);
   }, [isTouchDevice]);
 
+  useEffect(() => {
+    if (!isProcessing) {
+      setActiveStageIndex(0);
+      setStageVisible(true);
+      return undefined;
+    }
+
+    const stageInterval = window.setInterval(() => {
+      setStageVisible(false);
+      window.setTimeout(() => {
+        setActiveStageIndex((prev) => (prev + 1) % AI_PROGRESS_STAGES.length);
+        setStageVisible(true);
+      }, 220);
+    }, 1700);
+
+    return () => window.clearInterval(stageInterval);
+  }, [isProcessing]);
+
+  useEffect(() => {
+    if (!isProcessing) {
+      setScanOffset(-20);
+      return undefined;
+    }
+
+    let frameId;
+    const span = 140; // from -20% to 120% then loop
+    const cycleMs = 2200;
+    const start = performance.now();
+
+    const animateScan = (time) => {
+      const progress = ((time - start) % cycleMs) / cycleMs;
+      setScanOffset(-20 + span * progress);
+      frameId = window.requestAnimationFrame(animateScan);
+    };
+
+    frameId = window.requestAnimationFrame(animateScan);
+    return () => window.cancelAnimationFrame(frameId);
+  }, [isProcessing]);
+
   const handleHeroMouseMove = (e) => {
     const rect = e.currentTarget.getBoundingClientRect();
     heroTargetRef.current = {
@@ -139,6 +182,8 @@ export default function TryOnStudio() {
     try {
       setError("");
       setStatus("analyzing");
+      setActiveStageIndex(0);
+      setStageVisible(true);
       const response = await uploadMyImage({ imageFile: personFile, garmentFile });
       const job = response?.job;
       if (!job?.resultUrl) throw new Error("Result image URL was not generated");
@@ -299,7 +344,35 @@ export default function TryOnStudio() {
                 )}
               </div>
               <div className="flex-1 rounded-2xl bg-slate-100 overflow-hidden min-h-[320px] lg:min-h-0">
-                {status === "success" && resultImage ? (
+                {isProcessing ? (
+                  <div className="w-full h-full flex items-center justify-center p-6 bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-900">
+                    <div className="w-full max-w-md rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl p-8 text-center shadow-2xl relative overflow-hidden">
+                      <div className="absolute inset-0 opacity-40 bg-[radial-gradient(circle_at_50%_10%,rgba(56,189,248,0.25),transparent_38%)]" />
+                      <div className="relative mx-auto mb-5 w-16 h-16">
+                        <div className="absolute inset-0 rounded-full border border-cyan-300/30 animate-spin" />
+                        <div className="absolute inset-[7px] rounded-full border border-fuchsia-300/30 [animation:spin_3.2s_linear_infinite_reverse]" />
+                        <div className="absolute inset-[14px] rounded-full bg-gradient-to-br from-cyan-300 via-indigo-300 to-fuchsia-300 blur-[1px] animate-pulse" />
+                        <div className="absolute inset-[18px] rounded-full bg-slate-900/80 border border-white/20" />
+                        <div className="absolute inset-[6px] rounded-full border border-cyan-200/50 animate-ping" />
+                        <div className="absolute inset-[2px] rounded-full border border-indigo-200/40 animate-ping" style={{ animationDelay: "280ms" }} />
+                      </div>
+                      <div className="mx-auto mb-4 h-2 w-48 rounded-full bg-white/10 overflow-hidden relative">
+                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+                        <div
+                          className="absolute top-0 h-full w-16 -translate-x-1/2 rounded-full bg-gradient-to-r from-cyan-300/80 via-indigo-300/90 to-fuchsia-300/80 shadow-[0_0_14px_rgba(129,140,248,0.8)]"
+                          style={{ left: `${scanOffset}%` }}
+                        />
+                      </div>
+                      <p
+                        className={`text-sm sm:text-base font-medium text-white/90 transition-all duration-300 ${
+                          stageVisible ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-1"
+                        }`}
+                      >
+                        {AI_PROGRESS_STAGES[activeStageIndex]}
+                      </p>
+                    </div>
+                  </div>
+                ) : status === "success" && resultImage ? (
                   <img src={resultImage} alt="Generated try-on" className="w-full h-full object-cover" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-slate-500 text-sm p-6 text-center">
