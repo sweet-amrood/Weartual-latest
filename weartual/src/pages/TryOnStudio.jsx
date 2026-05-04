@@ -1,6 +1,6 @@
 import React, { useMemo, useRef, useState, useEffect } from "react";
 import { listDatasetSamples, uploadMyImage } from "../services/imageApi";
-import { Sparkles, Trash2, Download, ArrowRight, ThumbsUp, ThumbsDown, Star, MessageCircle, Music2, Link2, Share2, Send } from "lucide-react";
+import { Sparkles, Trash2, Download, Maximize2, X, ArrowRight, ThumbsUp, ThumbsDown, Star, MessageCircle, Music2, Link2, Share2, Send } from "lucide-react";
 import StyleInsightsPanel from "../components/StyleInsightsPanel";
 import { addOutfitHistoryEntry, getAuthenticatedUserId, getOutfitRating, saveOutfitRating } from "../services/outfitHistory";
 
@@ -71,6 +71,7 @@ export default function TryOnStudio({ user }) {
   const [improvementSuggestions, setImprovementSuggestions] = useState([]);
   const [shareFeedback, setShareFeedback] = useState("");
   const [resultVideoError, setResultVideoError] = useState("");
+  const [isImageFullscreenOpen, setIsImageFullscreenOpen] = useState(false);
   const heroTargetRef = useRef({ x: 50, y: 50 });
   const compareRef = useRef(null);
 
@@ -412,6 +413,11 @@ export default function TryOnStudio({ user }) {
     document.body.removeChild(a);
   };
 
+  const openResultFullscreen = () => {
+    if (!resultImage || resultMediaType !== "image") return;
+    setIsImageFullscreenOpen(true);
+  };
+
   const copyImageLink = async () => {
     if (!resultImage) return false;
     try {
@@ -590,6 +596,15 @@ export default function TryOnStudio({ user }) {
                     >
                       <Download className="w-3.5 h-3.5" /> Download {resultMediaType === "video" ? "Video" : "Image"}
                     </button>
+                    {resultMediaType === "image" && (
+                      <button
+                        type="button"
+                        onClick={openResultFullscreen}
+                        className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-700 text-xs font-semibold hover:bg-slate-50 transition-colors"
+                      >
+                        <Maximize2 className="w-3.5 h-3.5" /> Full Screen
+                      </button>
+                    )}
                     <div className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-1 py-1">
                       <button
                         type="button"
@@ -730,7 +745,9 @@ export default function TryOnStudio({ user }) {
                       }
                     />
                   ) : (
-                    <img src={resultImage} alt="Generated try-on" className="w-full h-full object-cover" />
+                    <div>
+                      <img src={resultImage} alt="Generated try-on" className="w-full h-full object-cover" />
+                    </div>
                   )
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-slate-500 text-sm p-6 text-center">
@@ -810,6 +827,18 @@ export default function TryOnStudio({ user }) {
           </div>
         </div>
       </div>
+      {isImageFullscreenOpen && resultImage && (
+        <div className="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center p-4">
+          <button
+            type="button"
+            onClick={() => setIsImageFullscreenOpen(false)}
+            className="absolute top-4 right-4 inline-flex items-center gap-1 rounded-lg border border-white/30 bg-black/40 px-3 py-1.5 text-white text-sm hover:bg-black/60"
+          >
+            <X className="w-4 h-4" /> Close
+          </button>
+          <img src={resultImage} alt="Generated try-on full view" className="max-w-full max-h-full object-contain" />
+        </div>
+      )}
     </div>
   );
 }
