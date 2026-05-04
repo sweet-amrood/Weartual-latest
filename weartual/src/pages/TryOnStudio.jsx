@@ -4,8 +4,11 @@ import { Sparkles, Trash2, Download, ArrowRight, ThumbsUp, ThumbsDown, Star, Mes
 import StyleInsightsPanel from "../components/StyleInsightsPanel";
 import { addOutfitHistoryEntry, getAuthenticatedUserId, getOutfitRating, saveOutfitRating } from "../services/outfitHistory";
 
-const VALID_TYPES = ["image/jpeg", "image/png", "image/webp"];
-const MAX_BYTES = 10 * 1024 * 1024;
+const PERSON_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
+const PERSON_VIDEO_TYPES = ["video/mp4", "video/webm", "video/quicktime"];
+const GARMENT_TYPES = ["image/jpeg", "image/png", "image/webp"];
+const PERSON_MAX_BYTES = 100 * 1024 * 1024;
+const GARMENT_MAX_BYTES = 10 * 1024 * 1024;
 const AI_PROGRESS_STAGES = ["Detecting pose...", "Applying cloth...", "Refining output..."];
 const LOCAL_CLOTH_DATASET = [
   "/dataset/cloth/00001_00.jpg",
@@ -32,9 +35,11 @@ export default function TryOnStudio({ user }) {
   const [garmentFile, setGarmentFile] = useState(null);
   const [personPreview, setPersonPreview] = useState(null);
   const [garmentPreview, setGarmentPreview] = useState(null);
+  const [personMediaType, setPersonMediaType] = useState("image");
   const [status, setStatus] = useState("idle");
   const [error, setError] = useState("");
   const [resultImage, setResultImage] = useState(null);
+  const [resultMediaType, setResultMediaType] = useState("image");
   const [resultFilename, setResultFilename] = useState("weartual-sys-output.jpg");
   const [personSamples, setPersonSamples] = useState([]);
   const [clothSamples, setClothSamples] = useState([]);
@@ -172,7 +177,7 @@ export default function TryOnStudio({ user }) {
   }, [status, resultImage, garmentPreview]);
 
   useEffect(() => {
-    if (!resultImage) {
+    if (!resultImage || resultMediaType !== "image") {
       setResultAspectRatio(null);
       return undefined;
     }
@@ -185,7 +190,7 @@ export default function TryOnStudio({ user }) {
     };
     img.src = resultImage;
     return undefined;
-  }, [resultImage]);
+  }, [resultImage, resultMediaType]);
 
   useEffect(() => {
     if (!currentOutfitId) {
@@ -225,16 +230,24 @@ export default function TryOnStudio({ user }) {
     };
   };
 
+  const detectMediaType = (file) => (file?.type?.startsWith("video/") ? "video" : "image");
+
   const setPreview = (type, file) => {
     if (!file) return;
-    if (!VALID_TYPES.includes(file.type)) return setError("Invalid file type. Please upload JPG/PNG/WEBP.");
-    if (file.size > MAX_BYTES) return setError("Image too large. Max size is 10MB.");
+    const isPerson = type === "person";
+    const validTypes = isPerson ? [...PERSON_IMAGE_TYPES, ...PERSON_VIDEO_TYPES] : GARMENT_TYPES;
+    const maxBytes = isPerson ? PERSON_MAX_BYTES : GARMENT_MAX_BYTES;
+    if (!validTypes.includes(file.type)) {
+      return setError(isPerson ? "Invalid person file type. Use JPG/PNG/WEBP or MP4/WEBM/MOV." : "Invalid garment file type. Use JPG/PNG/WEBP.");
+    }
+    if (file.size > maxBytes) return setError(isPerson ? "Person file too large. Max size is 100MB." : "Garment image too large. Max size is 10MB.");
     setError("");
     const url = URL.createObjectURL(file);
     if (type === "person") {
       if (personPreview) URL.revokeObjectURL(personPreview);
       setPersonFile(file);
       setPersonPreview(url);
+      setPersonMediaType(detectMediaType(file));
     } else {
       if (garmentPreview) URL.revokeObjectURL(garmentPreview);
       setGarmentFile(file);
@@ -242,6 +255,7 @@ export default function TryOnStudio({ user }) {
     }
     setStatus("idle");
     setResultImage(null);
+    setResultMediaType("image");
   };
 
   const useSample = async (type, sample) => {
@@ -269,6 +283,7 @@ export default function TryOnStudio({ user }) {
       setStatus("success");
       setComparePosition(50);
       setResultImage(job.resultUrl);
+      setResultMediaType(job.resultType === "video" ? "video" : "image");
       setResultFilename(job.resultFilename || "weartual-sys-output.jpg");
       setCurrentOutfitId(outfitId);
       setSelectedRating(null);
@@ -300,6 +315,7 @@ export default function TryOnStudio({ user }) {
       if (personPreview) URL.revokeObjectURL(personPreview);
       setPersonPreview(null);
       setPersonFile(null);
+      setPersonMediaType("image");
       if (personInputRef.current) personInputRef.current.value = "";
     } else {
       if (garmentPreview) URL.revokeObjectURL(garmentPreview);
@@ -374,7 +390,7 @@ export default function TryOnStudio({ user }) {
     try {
       if (navigator?.clipboard?.writeText) {
         await navigator.clipboard.writeText(resultImage);
-        setShareFeedback("Image link copied.");
+        setShareFeedback(`${resultMediaType === "video" ? "Video" : "Image"} link copied.`);
         window.setTimeout(() => setShareFeedback(""), 1800);
         return true;
       }
@@ -391,7 +407,7 @@ export default function TryOnStudio({ user }) {
   const handleSocialShare = async (platform) => {
     if (!resultImage) return;
     const encodedUrl = encodeURIComponent(resultImage);
-    const message = encodeURIComponent("Check out my AI try-on look!");
+    const message = encodeURIComponent(`Check out my AI try-on ${resultMediaType === "video" ? "video" : "look"}!`);
 
     if (platform === "facebook") {
       openShareUrl(`https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}`);
@@ -409,7 +425,7 @@ export default function TryOnStudio({ user }) {
     // TikTok web share is limited: fallback to copy link, then download.
     const copied = await copyImageLink();
     if (!copied) downloadCurrentResult();
-    setShareFeedback(copied ? "TikTok fallback: link copied." : "TikTok fallback: image downloaded.");
+    setShareFeedback(copied ? "TikTok fallback: link copied." : `TikTok fallback: ${resultMediaType} downloaded.`);
     window.setTimeout(() => setShareFeedback(""), 2000);
   };
 
@@ -478,7 +494,7 @@ export default function TryOnStudio({ user }) {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 lg:h-[calc(100vh-390px)] lg:min-h-[520px]">
           <div className="lg:col-span-5 flex flex-col gap-4 lg:overflow-auto pr-1">
             {[
-              { key: "person", title: "Person Image", preview: personPreview, ref: personInputRef, samples: personSamples },
+              { key: "person", title: "Person Input (Image/Video)", preview: personPreview, ref: personInputRef, samples: personSamples },
               { key: "garment", title: "Garment Image", preview: garmentPreview, ref: garmentInputRef, samples: clothSamples }
             ].map((block) => (
               <div key={block.key} className="rounded-2xl border border-slate-200 bg-white p-4">
@@ -488,12 +504,16 @@ export default function TryOnStudio({ user }) {
                     ref={block.ref}
                     type="file"
                     className="hidden"
-                    accept="image/jpeg,image/png,image/webp"
+                    accept={block.key === "person" ? "image/jpeg,image/png,image/webp,video/mp4,video/webm,video/quicktime" : "image/jpeg,image/png,image/webp"}
                     onChange={(e) => setPreview(block.key, e.target.files?.[0] || null)}
                   />
                   {block.preview ? (
                     <>
-                      <img src={block.preview} alt={block.title} className="w-full h-full object-contain bg-slate-50" />
+                      {block.key === "person" && personMediaType === "video" ? (
+                        <video src={block.preview} className="w-full h-full object-contain bg-slate-50" controls muted playsInline />
+                      ) : (
+                        <img src={block.preview} alt={block.title} className="w-full h-full object-contain bg-slate-50" />
+                      )}
                       <button onClick={(e) => { e.stopPropagation(); clearType(block.key); }} className="absolute top-3 right-3 p-2 rounded-lg bg-white border border-slate-200 text-slate-700">
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -541,7 +561,7 @@ export default function TryOnStudio({ user }) {
                       onClick={downloadCurrentResult}
                       className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg bg-brand-600 text-white text-xs font-semibold hover:bg-brand-500 transition-colors"
                     >
-                      <Download className="w-3.5 h-3.5" /> Download Image
+                      <Download className="w-3.5 h-3.5" /> Download {resultMediaType === "video" ? "Video" : "Image"}
                     </button>
                     <div className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-1 py-1">
                       <button
@@ -622,7 +642,7 @@ export default function TryOnStudio({ user }) {
                       </p>
                     </div>
                   </div>
-                ) : status === "success" && resultImage && garmentPreview ? (
+                ) : status === "success" && resultImage && resultMediaType === "image" && garmentPreview ? (
                   <div
                     ref={compareRef}
                     className="relative w-full overflow-hidden bg-black select-none"
@@ -665,7 +685,11 @@ export default function TryOnStudio({ user }) {
                     </div>
                   </div>
                 ) : status === "success" && resultImage ? (
-                  <img src={resultImage} alt="Generated try-on" className="w-full h-full object-cover" />
+                  resultMediaType === "video" ? (
+                    <video src={resultImage} controls playsInline className="w-full h-full object-contain bg-black" />
+                  ) : (
+                    <img src={resultImage} alt="Generated try-on" className="w-full h-full object-cover" />
+                  )
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-slate-500 text-sm p-6 text-center">
                     Upload person + garment images on the left, then click Generate to view the output here.
@@ -740,7 +764,7 @@ export default function TryOnStudio({ user }) {
                 </div>
               )}
             </div>
-            {status === "success" && resultImage && <StyleInsightsPanel personImageUrl={personPreview} clothImageUrl={garmentPreview} />}
+            {status === "success" && resultImage && personMediaType === "image" && <StyleInsightsPanel personImageUrl={personPreview} clothImageUrl={garmentPreview} />}
           </div>
         </div>
       </div>

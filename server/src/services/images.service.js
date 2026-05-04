@@ -5,9 +5,11 @@ import fs from "fs/promises";
 import path from "path";
 import { fileURLToPath } from "url";
 
-const ALLOWED_CONTENT_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+const PERSON_ALLOWED_CONTENT_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "video/mp4", "video/webm", "video/quicktime"]);
+const GARMENT_ALLOWED_CONTENT_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 const DATASET_ALLOWED_EXTENSIONS = new Set([".jpg", ".jpeg", ".png", ".webp", ".json"]);
-const MAX_BYTES = 10 * 1024 * 1024;
+const PERSON_MAX_BYTES = 100 * 1024 * 1024;
+const GARMENT_MAX_BYTES = 10 * 1024 * 1024;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const RESULT_DIR = path.resolve(__dirname, "../../result");
@@ -43,15 +45,24 @@ const toClientImage = (doc) => ({
   error: doc.error,
   resultUrl: doc.resultUrl,
   resultFilename: doc.resultFilename,
+  resultType: doc.resultType || "image",
   stableVitonBundle: doc.stableVitonBundle,
   createdAt: doc.createdAt,
   updatedAt: doc.updatedAt
 });
 
-const validateFile = (file, label) => {
-  if (!file) throw new AppError(`${label} file is required`, 400);
-  if (!ALLOWED_CONTENT_TYPES.has(file.mimetype)) throw new AppError("Only JPEG/PNG/WebP images are allowed", 400);
-  if (file.size > MAX_BYTES) throw new AppError("Max image size is 10MB", 400);
+const validatePersonFile = (file) => {
+  if (!file) throw new AppError("Person file is required", 400);
+  if (!PERSON_ALLOWED_CONTENT_TYPES.has(file.mimetype)) {
+    throw new AppError("Person must be JPEG/PNG/WebP image or MP4/WebM/MOV video", 400);
+  }
+  if (file.size > PERSON_MAX_BYTES) throw new AppError("Max person file size is 100MB", 400);
+};
+
+const validateGarmentFile = (file) => {
+  if (!file) throw new AppError("Garment file is required", 400);
+  if (!GARMENT_ALLOWED_CONTENT_TYPES.has(file.mimetype)) throw new AppError("Garment must be JPEG/PNG/WebP image", 400);
+  if (file.size > GARMENT_MAX_BYTES) throw new AppError("Max garment image size is 10MB", 400);
 };
 
 const parseFileIdentity = (fileName) => {
@@ -84,6 +95,26 @@ const uploadBufferToCloudinary = (buffer, folder, fileName) =>
       {
         folder,
         resource_type: "image",
+        public_id: buildPublicId(fileName),
+        use_filename: true,
+        unique_filename: false,
+        overwrite: true,
+        filename_override: fileName
+      },
+      (error, result) => {
+        if (error) return reject(error);
+        return resolve(result);
+      }
+    );
+    stream.end(buffer);
+  });
+
+const uploadBufferToCloudinaryAuto = (buffer, folder, fileName) =>
+  new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(
+      {
+        folder,
+        resource_type: "auto",
         public_id: buildPublicId(fileName),
         use_filename: true,
         unique_filename: false,
@@ -190,30 +221,33 @@ const buildStableVitonInputBundle = async ({ personPrefix, clothPrefix, cloudRoo
   };
 };
 
-const createMockResultAndUpload = async (imageFile) => {
+const createMockResultAndUpload = async (personFile) => {
   await fs.mkdir(RESULT_DIR, { recursive: true });
-  const originalName = getOriginalFileName(imageFile.originalname, "result.jpg");
+  const originalName = getOriginalFileName(personFile.originalname, "result.jpg");
   const extension = path.extname(originalName) || ".jpg";
-  const resultBuffer = imageFile.buffer;
+  const resultBuffer = personFile.buffer;
   const resultFileName = originalName.endsWith(extension) ? originalName : `${originalName}${extension}`;
   const resultFilePath = path.join(RESULT_DIR, resultFileName);
   await fs.writeFile(resultFilePath, resultBuffer);
 
-  const resultUpload = await uploadBufferToCloudinary(resultBuffer, "uploads/result", resultFileName);
+  const resultUpload = await uploadBufferToCloudinaryAuto(resultBuffer, "uploads/result", resultFileName);
 
   if (!resultUpload?.secure_url) {
     throw new AppError("Cloudinary result upload failed to return secure URL", 500);
   }
 
+  const resultType = String(resultUpload.resource_type || "").toLowerCase() === "video" ? "video" : "image";
+
   return {
     resultUrl: resultUpload.secure_url,
-    resultFilename: resultFileName
+    resultFilename: resultFileName,
+    resultType
   };
 };
 
 export const uploadImageService = async ({ userId, imageFile, garmentFile }) => {
-  validateFile(imageFile, "Image");
-  validateFile(garmentFile, "Garment");
+  validatePersonFile(imageFile);
+  validateGarmentFile(garmentFile);
 
   const imageName = getOriginalFileName(imageFile.originalname, "image.jpg");
   const garmentName = getOriginalFileName(garmentFile.originalname, "garment.jpg");
@@ -227,7 +261,7 @@ export const uploadImageService = async ({ userId, imageFile, garmentFile }) => 
 
   try {
     const [imageUpload, garmentUpload] = await Promise.all([
-      uploadBufferToCloudinary(imageFile.buffer, "uploads/image", imageName),
+      uploadBufferToCloudinaryAuto(imageFile.buffer, "uploads/image", imageName),
       uploadBufferToCloudinary(garmentFile.buffer, "uploads/garment", garmentName)
     ]);
 
@@ -250,16 +284,7 @@ export const uploadImageService = async ({ userId, imageFile, garmentFile }) => 
       cloudRootFolder: `uploads/stableviton/${userId}/${Date.now()}`
     });
 
-    const hasPersonDatasetAssets = (stableVitonBundle.assets?.image || []).length > 0;
-    const hasClothDatasetAssets = (stableVitonBundle.assets?.cloth || []).length > 0;
-    if (!hasPersonDatasetAssets || !hasClothDatasetAssets) {
-      throw new AppError(
-        "Could not find matching dataset assets for the uploaded file names. Use dataset-style names (e.g. 00011_00) or choose sample images.",
-        400
-      );
-    }
-
-    const { resultUrl, resultFilename } = await createMockResultAndUpload(imageFile);
+    const { resultUrl, resultFilename, resultType } = await createMockResultAndUpload(imageFile);
 
     const job = await UploadedImage.create({
       userId,
@@ -272,6 +297,7 @@ export const uploadImageService = async ({ userId, imageFile, garmentFile }) => 
       error: null,
       resultUrl,
       resultFilename,
+      resultType,
       stableVitonBundle
     });
 

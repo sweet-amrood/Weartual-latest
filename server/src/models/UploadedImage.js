@@ -19,6 +19,7 @@ const uploadedImageSchema = new mongoose.Schema(
     error: { type: String, default: null },
     resultUrl: { type: String, default: null },
     resultFilename: { type: String, default: null },
+    resultType: { type: String, enum: ["image", "video"], default: "image" },
     stableVitonBundle: {
       personPrefix: { type: String, default: null },
       clothPrefix: { type: String, default: null },
