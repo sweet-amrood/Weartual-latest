@@ -4,6 +4,7 @@ import path from "path";
 import { accessSync, constants } from "fs";
 import { fileURLToPath } from "url";
 import AppError from "../utils/AppError.js";
+import { mergeDecartVendorPythonPath } from "../utils/decartPythonVendorEnv.js";
 
 const DEFAULT_TIMEOUT_MS = 12 * 60 * 1000;
 const __filename = fileURLToPath(import.meta.url);
@@ -75,7 +76,7 @@ export const runDecartPhotoPipeline = ({
     };
 
     const child = spawn(pythonBin, [scriptPath, absPerson, absGarment, absOut], {
-      env: { ...process.env },
+      env: mergeDecartVendorPythonPath(process.env),
       stdio: ["ignore", "pipe", "pipe"]
     });
 

@@ -9,6 +9,7 @@ uploads/
 
 # Dependencies
 node_modules/
+python_vendor/
 
 # Logs and runtime
 logs/
