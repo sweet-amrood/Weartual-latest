@@ -9,6 +9,31 @@ const DEFAULT_TIMEOUT_MS = 12 * 60 * 1000;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const DEFAULT_PHOTO_SCRIPT_PATH = path.resolve(__dirname, "../../preprocessing/photo.py");
+const SERVER_ROOT = path.resolve(__dirname, "../..");
+
+const resolveScriptPath = (configuredPath, fallbackPath) => {
+  const raw = (configuredPath || "").trim();
+  const candidates = [];
+  if (raw) {
+    if (path.isAbsolute(raw)) {
+      candidates.push(raw);
+    } else {
+      candidates.push(path.resolve(process.cwd(), raw));
+      candidates.push(path.resolve(SERVER_ROOT, raw));
+    }
+  }
+  candidates.push(fallbackPath);
+
+  for (const candidate of candidates) {
+    try {
+      accessSync(candidate, constants.R_OK);
+      return candidate;
+    } catch {
+      // Try next candidate
+    }
+  }
+  return { attempted: candidates };
+};
 
 /**
  * Runs Decart photo.py: person image + garment reference -> output image file (PNG).
@@ -21,19 +46,20 @@ export const runDecartPhotoPipeline = ({
   timeoutMs = DEFAULT_TIMEOUT_MS
 }) =>
   new Promise((resolve, reject) => {
-    const scriptPath = (process.env.DECART_PHOTO_SCRIPT || DEFAULT_PHOTO_SCRIPT_PATH).trim();
+    const resolved = resolveScriptPath(process.env.DECART_PHOTO_SCRIPT, DEFAULT_PHOTO_SCRIPT_PATH);
 
     if (!(process.env.DECART_API_KEY || "").trim()) {
       reject(new AppError("DECART_API_KEY is not set (required for image try-on).", 500));
       return;
     }
 
-    try {
-      accessSync(scriptPath, constants.R_OK);
-    } catch {
-      reject(new AppError(`Decart photo script cannot be read: ${scriptPath}`, 500));
+    if (typeof resolved !== "string") {
+      reject(
+        new AppError(`Decart photo script cannot be read. Tried: ${resolved.attempted.join(" | ")}`, 500)
+      );
       return;
     }
+    const scriptPath = resolved;
 
     const pythonBin = (process.env.DECART_PYTHON || "python").trim() || "python";
     const absPerson = path.resolve(personImagePath);

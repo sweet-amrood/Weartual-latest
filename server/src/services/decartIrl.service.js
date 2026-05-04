@@ -9,6 +9,31 @@ const DEFAULT_TIMEOUT_MS = 15 * 60 * 1000;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const DEFAULT_IRL_SCRIPT_PATH = path.resolve(__dirname, "../../preprocessing/irl.py");
+const SERVER_ROOT = path.resolve(__dirname, "../..");
+
+const resolveScriptPath = (configuredPath, fallbackPath) => {
+  const raw = (configuredPath || "").trim();
+  const candidates = [];
+  if (raw) {
+    if (path.isAbsolute(raw)) {
+      candidates.push(raw);
+    } else {
+      candidates.push(path.resolve(process.cwd(), raw));
+      candidates.push(path.resolve(SERVER_ROOT, raw));
+    }
+  }
+  candidates.push(fallbackPath);
+
+  for (const candidate of candidates) {
+    try {
+      accessSync(candidate, constants.R_OK);
+      return candidate;
+    } catch {
+      // Try next candidate
+    }
+  }
+  return { attempted: candidates };
+};
 
 /**
  * Runs the Decart IRL Python pipeline (irl.py): person video + garment reference image -> output MP4.
@@ -16,19 +41,20 @@ const DEFAULT_IRL_SCRIPT_PATH = path.resolve(__dirname, "../../preprocessing/irl
  */
 export const runDecartIrlPipeline = ({ videoPath, referenceImagePath, outputPath, timeoutMs = DEFAULT_TIMEOUT_MS }) =>
   new Promise((resolve, reject) => {
-    const scriptPath = (process.env.DECART_IRL_SCRIPT || DEFAULT_IRL_SCRIPT_PATH).trim();
+    const resolved = resolveScriptPath(process.env.DECART_IRL_SCRIPT, DEFAULT_IRL_SCRIPT_PATH);
 
     if (!(process.env.DECART_API_KEY || "").trim()) {
       reject(new AppError("DECART_API_KEY is not set (required for person video try-on).", 500));
       return;
     }
 
-    try {
-      accessSync(scriptPath, constants.R_OK);
-    } catch {
-      reject(new AppError(`Decart IRL script cannot be read: ${scriptPath}`, 500));
+    if (typeof resolved !== "string") {
+      reject(
+        new AppError(`Decart IRL script cannot be read. Tried: ${resolved.attempted.join(" | ")}`, 500)
+      );
       return;
     }
+    const scriptPath = resolved;
 
     const pythonBin = (process.env.DECART_PYTHON || "python").trim() || "python";
     const absVideo = path.resolve(videoPath);
