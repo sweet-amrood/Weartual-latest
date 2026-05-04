@@ -6,6 +6,7 @@ import fs from "fs/promises";
 import path from "path";
 import { fileURLToPath } from "url";
 import { runDecartIrlPipeline } from "./decartIrl.service.js";
+import { runDecartPhotoPipeline } from "./decartPhoto.service.js";
 import { transcodeToH264FastStartInPlace } from "../utils/transcodeWebVideo.js";
 
 const PERSON_ALLOWED_CONTENT_TYPES = new Set([
@@ -261,30 +262,6 @@ const buildStableVitonInputBundle = async ({ personPrefix, clothPrefix, cloudRoo
   };
 };
 
-const createMockResultAndUpload = async (personFile) => {
-  await fs.mkdir(RESULT_DIR, { recursive: true });
-  const originalName = getOriginalFileName(personFile.originalname, "result.jpg");
-  const extension = path.extname(originalName) || ".jpg";
-  const resultBuffer = personFile.buffer;
-  const resultFileName = originalName.endsWith(extension) ? originalName : `${originalName}${extension}`;
-  const resultFilePath = path.join(RESULT_DIR, resultFileName);
-  await fs.writeFile(resultFilePath, resultBuffer);
-
-  const resultUpload = await uploadBufferToCloudinaryAuto(resultBuffer, "uploads/result", resultFileName);
-
-  if (!resultUpload?.secure_url) {
-    throw new AppError("Cloudinary result upload failed to return secure URL", 500);
-  }
-
-  const resultType = String(resultUpload.resource_type || "").toLowerCase() === "video" ? "video" : "image";
-
-  return {
-    resultUrl: resultUpload.secure_url,
-    resultFilename: resultFileName,
-    resultType
-  };
-};
-
 const isPersonVideoFile = (file, imageName) => {
   const mt = String(file.mimetype || "").toLowerCase();
   if (mt.startsWith("video/")) return true;
@@ -325,13 +302,7 @@ export const uploadImageService = async ({ userId, imageFile, garmentFile }) => 
       garmentUrl
     });
 
-    const stableVitonBundle = isPersonVideo
-      ? { personPrefix, clothPrefix, cloudRoot: null, assets: {} }
-      : await buildStableVitonInputBundle({
-          personPrefix,
-          clothPrefix,
-          cloudRootFolder: `uploads/stableviton/${userId}/${Date.now()}`
-        });
+    const stableVitonBundle = { personPrefix, clothPrefix, cloudRoot: null, assets: {} };
 
     let resultUrl;
     let resultFilename;
@@ -376,10 +347,34 @@ export const uploadImageService = async ({ userId, imageFile, garmentFile }) => 
       resultUrl = resultUpload.secure_url;
       resultType = "video";
     } else {
-      const created = await createMockResultAndUpload(imageFile);
-      resultUrl = created.resultUrl;
-      resultFilename = created.resultFilename;
-      resultType = created.resultType;
+      await fs.mkdir(RESULT_DIR, { recursive: true });
+      const personDiskPath = path.join(UPLOADS_DIR, "image", imageName);
+      const garmentDiskPath = path.join(UPLOADS_DIR, "garment", garmentName);
+      resultFilename = `photo-out-${Date.now()}.png`;
+      const outputDiskPath = path.join(RESULT_DIR, resultFilename);
+
+      console.info("[images] Running Decart image try-on (photo.py)", {
+        userId: String(userId),
+        personDiskPath,
+        garmentDiskPath,
+        outputDiskPath
+      });
+
+      await runDecartPhotoPipeline({
+        personImagePath: personDiskPath,
+        garmentImagePath: garmentDiskPath,
+        outputPath: outputDiskPath
+      });
+
+      const resultBuffer = await fs.readFile(outputDiskPath);
+      const resultUpload = await uploadBufferToCloudinary(resultBuffer, "uploads/result", resultFilename);
+
+      if (!resultUpload?.secure_url) {
+        throw new AppError("Cloudinary result upload failed to return secure URL", 500);
+      }
+
+      resultUrl = resultUpload.secure_url;
+      resultType = "image";
     }
 
     const job = await UploadedImage.create({
