@@ -1,0 +1,88 @@
+import { spawn } from "child_process";
+import fs from "fs/promises";
+import path from "path";
+import { accessSync, constants } from "fs";
+import AppError from "../utils/AppError.js";
+
+const DEFAULT_TIMEOUT_MS = 15 * 60 * 1000;
+
+/**
+ * Runs the Decart IRL Python pipeline (irl.py): person video + garment reference image -> output MP4.
+ * Requires DECART_IRL_SCRIPT (path to irl.py), DECART_API_KEY, and Python with decart deps on PATH.
+ */
+export const runDecartIrlPipeline = ({ videoPath, referenceImagePath, outputPath, timeoutMs = DEFAULT_TIMEOUT_MS }) =>
+  new Promise((resolve, reject) => {
+    const scriptPath = (process.env.DECART_IRL_SCRIPT || "").trim();
+    if (!scriptPath) {
+      reject(new AppError("Server is not configured for video try-on (set DECART_IRL_SCRIPT).", 500));
+      return;
+    }
+
+    if (!(process.env.DECART_API_KEY || "").trim()) {
+      reject(new AppError("DECART_API_KEY is not set (required for person video try-on).", 500));
+      return;
+    }
+
+    try {
+      accessSync(scriptPath, constants.R_OK);
+    } catch {
+      reject(new AppError("DECART_IRL_SCRIPT points to a file that cannot be read.", 500));
+      return;
+    }
+
+    const pythonBin = (process.env.DECART_PYTHON || "python").trim() || "python";
+    const absVideo = path.resolve(videoPath);
+    const absRef = path.resolve(referenceImagePath);
+    const absOut = path.resolve(outputPath);
+
+    let settled = false;
+    const finish = (fn) => {
+      if (settled) return;
+      settled = true;
+      fn();
+    };
+
+    const child = spawn(pythonBin, [scriptPath, absVideo, absRef, absOut], {
+      env: { ...process.env },
+      stdio: ["ignore", "pipe", "pipe"]
+    });
+
+    let stderr = "";
+    let stdout = "";
+
+    const timer = setTimeout(() => {
+      child.kill("SIGTERM");
+      finish(() => reject(new AppError("Decart IRL pipeline timed out.", 504)));
+    }, timeoutMs);
+
+    child.stdout?.on("data", (chunk) => {
+      stdout += chunk.toString();
+    });
+    child.stderr?.on("data", (chunk) => {
+      stderr += chunk.toString();
+    });
+
+    child.on("error", (err) => {
+      clearTimeout(timer);
+      finish(() => reject(new AppError(`Failed to start Python: ${err.message}`, 500)));
+    });
+
+    child.on("close", async (code) => {
+      clearTimeout(timer);
+      if (settled) return;
+      if (code !== 0) {
+        const tail = (stderr || stdout).trim().slice(-2000);
+        finish(() =>
+          reject(new AppError(tail ? `Decart IRL failed: ${tail}` : `Decart IRL exited with code ${code}`, 502))
+        );
+        return;
+      }
+      try {
+        await fs.access(absOut);
+      } catch {
+        finish(() => reject(new AppError("Decart IRL finished but output file is missing.", 502)));
+        return;
+      }
+      finish(() => resolve({ outputPath: absOut }));
+    });
+  });

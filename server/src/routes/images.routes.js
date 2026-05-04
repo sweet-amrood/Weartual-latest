@@ -5,6 +5,7 @@ import {
   getDatasetSampleFile,
   listDatasetSamples,
   listMyImages,
+  streamDecartJobVideo,
   uploadMyImage
 } from "../controllers/images.controller.js";
 
@@ -14,6 +15,7 @@ const upload = multer({ storage: multer.memoryStorage() });
 router.get("/samples", listDatasetSamples);
 router.get("/samples/file", getDatasetSampleFile);
 router.get("/me", requireAuth, listMyImages);
+router.get("/jobs/:jobId/decart-result", requireAuth, streamDecartJobVideo);
 router.post(
   "/me",
   requireAuth,

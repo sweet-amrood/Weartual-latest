@@ -1,6 +1,8 @@
+import path from "path";
 import asyncHandler from "../utils/asyncHandler.js";
 import {
   getDatasetSampleFileService,
+  getDecartResultFileForStreaming,
   listDatasetSamplesService,
   listMyImagesService,
   uploadImageService
@@ -33,5 +35,12 @@ export const getDatasetSampleFile = asyncHandler(async (req, res) => {
   const name = String(req.query.name || "");
   const filePath = await getDatasetSampleFileService({ type, name });
   res.sendFile(filePath);
+});
+
+export const streamDecartJobVideo = asyncHandler(async (req, res) => {
+  const { filePath } = await getDecartResultFileForStreaming(req.params.jobId, req.user.userId);
+  res.setHeader("Content-Type", "video/mp4");
+  res.setHeader("Accept-Ranges", "bytes");
+  res.sendFile(path.resolve(filePath));
 });
 

@@ -1,11 +1,23 @@
+import mongoose from "mongoose";
 import AppError from "../utils/AppError.js";
 import UploadedImage from "../models/UploadedImage.js";
 import cloudinary from "../config/cloudinary.js";
 import fs from "fs/promises";
 import path from "path";
 import { fileURLToPath } from "url";
+import { runDecartIrlPipeline } from "./decartIrl.service.js";
+import { transcodeToH264FastStartInPlace } from "../utils/transcodeWebVideo.js";
 
-const PERSON_ALLOWED_CONTENT_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "video/mp4", "video/webm", "video/quicktime"]);
+const PERSON_ALLOWED_CONTENT_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "video/mp4",
+  "video/webm",
+  "video/quicktime",
+  "application/octet-stream"
+]);
+const PERSON_VIDEO_EXTENSIONS = new Set([".mp4", ".webm", ".mov", ".m4v"]);
 const GARMENT_ALLOWED_CONTENT_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 const DATASET_ALLOWED_EXTENSIONS = new Set([".jpg", ".jpeg", ".png", ".webp", ".json"]);
 const PERSON_MAX_BYTES = 100 * 1024 * 1024;
@@ -53,7 +65,14 @@ const toClientImage = (doc) => ({
 
 const validatePersonFile = (file) => {
   if (!file) throw new AppError("Person file is required", 400);
-  if (!PERSON_ALLOWED_CONTENT_TYPES.has(file.mimetype)) {
+  const ext = path.extname(getOriginalFileName(file.originalname, "")).toLowerCase();
+  const looksVideo = PERSON_VIDEO_EXTENSIONS.has(ext);
+  const looksImage = [".jpg", ".jpeg", ".png", ".webp"].includes(ext);
+  const mt = String(file.mimetype || "").toLowerCase();
+  const allowed =
+    PERSON_ALLOWED_CONTENT_TYPES.has(file.mimetype) ||
+    (mt === "application/octet-stream" && (looksVideo || looksImage));
+  if (!allowed) {
     throw new AppError("Person must be JPEG/PNG/WebP image or MP4/WebM/MOV video", 400);
   }
   if (file.size > PERSON_MAX_BYTES) throw new AppError("Max person file size is 100MB", 400);
@@ -115,6 +134,27 @@ const uploadBufferToCloudinaryAuto = (buffer, folder, fileName) =>
       {
         folder,
         resource_type: "auto",
+        public_id: buildPublicId(fileName),
+        use_filename: true,
+        unique_filename: false,
+        overwrite: true,
+        filename_override: fileName
+      },
+      (error, result) => {
+        if (error) return reject(error);
+        return resolve(result);
+      }
+    );
+    stream.end(buffer);
+  });
+
+/** OpenCV mp4v MP4s are often mis-tagged as image with resource_type auto; browsers need <video> + video resource on Cloudinary. */
+const uploadBufferToCloudinaryVideo = (buffer, folder, fileName) =>
+  new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(
+      {
+        folder,
+        resource_type: "video",
         public_id: buildPublicId(fileName),
         use_filename: true,
         unique_filename: false,
@@ -245,11 +285,18 @@ const createMockResultAndUpload = async (personFile) => {
   };
 };
 
+const isPersonVideoFile = (file, imageName) => {
+  const mt = String(file.mimetype || "").toLowerCase();
+  if (mt.startsWith("video/")) return true;
+  return PERSON_VIDEO_EXTENSIONS.has(path.extname(imageName).toLowerCase());
+};
+
 export const uploadImageService = async ({ userId, imageFile, garmentFile }) => {
   validatePersonFile(imageFile);
   validateGarmentFile(garmentFile);
 
   const imageName = getOriginalFileName(imageFile.originalname, "image.jpg");
+  const isPersonVideo = isPersonVideoFile(imageFile, imageName);
   const garmentName = getOriginalFileName(garmentFile.originalname, "garment.jpg");
   const personPrefix = deriveDatasetPrefix(imageName);
   const clothPrefix = deriveDatasetPrefix(garmentName);
@@ -278,13 +325,62 @@ export const uploadImageService = async ({ userId, imageFile, garmentFile }) => 
       garmentUrl
     });
 
-    const stableVitonBundle = await buildStableVitonInputBundle({
-      personPrefix,
-      clothPrefix,
-      cloudRootFolder: `uploads/stableviton/${userId}/${Date.now()}`
-    });
+    const stableVitonBundle = isPersonVideo
+      ? { personPrefix, clothPrefix, cloudRoot: null, assets: {} }
+      : await buildStableVitonInputBundle({
+          personPrefix,
+          clothPrefix,
+          cloudRootFolder: `uploads/stableviton/${userId}/${Date.now()}`
+        });
 
-    const { resultUrl, resultFilename, resultType } = await createMockResultAndUpload(imageFile);
+    let resultUrl;
+    let resultFilename;
+    let resultType;
+
+    if (isPersonVideo) {
+      await fs.mkdir(RESULT_DIR, { recursive: true });
+      const videoDiskPath = path.join(UPLOADS_DIR, "image", imageName);
+      const garmentDiskPath = path.join(UPLOADS_DIR, "garment", garmentName);
+      resultFilename = `irl-out-${Date.now()}.mp4`;
+      const outputDiskPath = path.join(RESULT_DIR, resultFilename);
+
+      console.info("[images] Running Decart IRL pipeline for person video", {
+        userId: String(userId),
+        videoDiskPath,
+        garmentDiskPath,
+        outputDiskPath
+      });
+
+      await runDecartIrlPipeline({
+        videoPath: videoDiskPath,
+        referenceImagePath: garmentDiskPath,
+        outputPath: outputDiskPath
+      });
+
+      const transcoded = await transcodeToH264FastStartInPlace(outputDiskPath);
+      if (transcoded) {
+        console.info("[images] Transcoded IRL output to H.264 for web playback");
+      } else {
+        console.warn(
+          "[images] FFmpeg H.264 transcode skipped or failed — install ffmpeg and add to PATH (or set FFMPEG_PATH). OpenCV mp4v may not play in all browsers."
+        );
+      }
+
+      const resultBuffer = await fs.readFile(outputDiskPath);
+      const resultUpload = await uploadBufferToCloudinaryVideo(resultBuffer, "uploads/result", resultFilename);
+
+      if (!resultUpload?.secure_url) {
+        throw new AppError("Cloudinary result upload failed to return secure URL", 500);
+      }
+
+      resultUrl = resultUpload.secure_url;
+      resultType = "video";
+    } else {
+      const created = await createMockResultAndUpload(imageFile);
+      resultUrl = created.resultUrl;
+      resultFilename = created.resultFilename;
+      resultType = created.resultType;
+    }
 
     const job = await UploadedImage.create({
       userId,
@@ -376,3 +472,41 @@ export const getDatasetSampleFileService = async ({ type, name }) => {
   throw new AppError("Sample file not found", 404);
 };
 
+/**
+ * Resolve on-disk Decart/IRL output for authenticated streaming (Range-friendly playback from same origin).
+ */
+export const getDecartResultFileForStreaming = async (jobId, userId) => {
+  if (!mongoose.isValidObjectId(jobId)) {
+    throw new AppError("Invalid job id", 400);
+  }
+
+  const job = await UploadedImage.findOne({ _id: jobId, userId }).select("resultFilename resultType").lean();
+  if (!job) {
+    throw new AppError("Job not found", 404);
+  }
+
+  const safeName = path.basename(job.resultFilename || "");
+  if (!safeName || !/\.(mp4|webm|mov)$/i.test(safeName)) {
+    throw new AppError("No streamable video for this job", 404);
+  }
+
+  const isVideoJob = job.resultType === "video" || /^irl-out-/i.test(safeName);
+  if (!isVideoJob) {
+    throw new AppError("No streamable video for this job", 404);
+  }
+
+  const resultRoot = path.resolve(RESULT_DIR);
+  const filePath = path.resolve(path.join(resultRoot, safeName));
+  const relative = path.relative(resultRoot, filePath);
+  if (relative.startsWith("..") || path.isAbsolute(relative)) {
+    throw new AppError("Invalid result path", 400);
+  }
+
+  try {
+    await fs.access(filePath);
+  } catch {
+    throw new AppError("Result file is not available on disk anymore", 404);
+  }
+
+  return { filePath };
+};

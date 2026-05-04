@@ -30,6 +30,18 @@ const pickRandomItems = (items, count = 4) => {
   return source.slice(0, count);
 };
 
+const VIDEO_NAME_RE = /\.(mp4|webm|mov|m4v)$/i;
+const IMAGE_NAME_RE = /\.(jpe?g|png|webp)$/i;
+
+/** Prefer <video> when API mis-labels OpenCV MP4 as image, or URL is clearly Cloudinary video delivery. */
+const inferResultIsVideo = (job) => {
+  if (!job) return false;
+  if (job.resultType === "video") return true;
+  if (VIDEO_NAME_RE.test(job.resultFilename || "")) return true;
+  if (/\/video\/upload\//.test(job.resultUrl || "")) return true;
+  return false;
+};
+
 export default function TryOnStudio({ user }) {
   const [personFile, setPersonFile] = useState(null);
   const [garmentFile, setGarmentFile] = useState(null);
@@ -58,6 +70,7 @@ export default function TryOnStudio({ user }) {
   const [ratingLocked, setRatingLocked] = useState(false);
   const [improvementSuggestions, setImprovementSuggestions] = useState([]);
   const [shareFeedback, setShareFeedback] = useState("");
+  const [resultVideoError, setResultVideoError] = useState("");
   const heroTargetRef = useRef({ x: 50, y: 50 });
   const compareRef = useRef(null);
 
@@ -230,14 +243,22 @@ export default function TryOnStudio({ user }) {
     };
   };
 
-  const detectMediaType = (file) => (file?.type?.startsWith("video/") ? "video" : "image");
+  const detectMediaType = (file) => {
+    const t = (file?.type || "").toLowerCase();
+    if (t.startsWith("video/")) return "video";
+    if (t.startsWith("image/")) return "image";
+    if (VIDEO_NAME_RE.test(file?.name || "")) return "video";
+    return "image";
+  };
 
   const setPreview = (type, file) => {
     if (!file) return;
     const isPerson = type === "person";
-    const validTypes = isPerson ? [...PERSON_IMAGE_TYPES, ...PERSON_VIDEO_TYPES] : GARMENT_TYPES;
+    const validTypes = isPerson ? [...PERSON_IMAGE_TYPES, ...PERSON_VIDEO_TYPES, "application/octet-stream"] : GARMENT_TYPES;
     const maxBytes = isPerson ? PERSON_MAX_BYTES : GARMENT_MAX_BYTES;
-    if (!validTypes.includes(file.type)) {
+    const personOctetOk =
+      isPerson && file.type === "application/octet-stream" && (VIDEO_NAME_RE.test(file.name || "") || IMAGE_NAME_RE.test(file.name || ""));
+    if (!validTypes.includes(file.type) && !personOctetOk) {
       return setError(isPerson ? "Invalid person file type. Use JPG/PNG/WEBP or MP4/WEBM/MOV." : "Invalid garment file type. Use JPG/PNG/WEBP.");
     }
     if (file.size > maxBytes) return setError(isPerson ? "Person file too large. Max size is 100MB." : "Garment image too large. Max size is 10MB.");
@@ -256,6 +277,7 @@ export default function TryOnStudio({ user }) {
     setStatus("idle");
     setResultImage(null);
     setResultMediaType("image");
+    setResultVideoError("");
   };
 
   const useSample = async (type, sample) => {
@@ -273,6 +295,7 @@ export default function TryOnStudio({ user }) {
     if (!person || !garment) return setError("Upload both person and garment images first.");
     try {
       setError("");
+      setResultVideoError("");
       setStatus("analyzing");
       setActiveStageIndex(0);
       setStageVisible(true);
@@ -283,7 +306,11 @@ export default function TryOnStudio({ user }) {
       setStatus("success");
       setComparePosition(50);
       setResultImage(job.resultUrl);
-      setResultMediaType(job.resultType === "video" ? "video" : "image");
+      const personWasVideo =
+        String(person?.type || "")
+          .toLowerCase()
+          .startsWith("video/") || VIDEO_NAME_RE.test(person?.name || "");
+      setResultMediaType(personWasVideo || inferResultIsVideo(job) ? "video" : "image");
       setResultFilename(job.resultFilename || "weartual-sys-output.jpg");
       setCurrentOutfitId(outfitId);
       setSelectedRating(null);
@@ -609,6 +636,9 @@ export default function TryOnStudio({ user }) {
                 )}
               </div>
               {shareFeedback && <p className="px-1 pb-2 text-xs text-slate-500">{shareFeedback}</p>}
+              {status === "success" && resultVideoError && (
+                <p className="px-1 pb-2 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-2">{resultVideoError}</p>
+              )}
               <div
                 className={`rounded-2xl bg-slate-100 overflow-hidden ${
                   isProcessing ? "h-full min-h-[320px] lg:min-h-0" : status === "success" && resultImage ? "" : "min-h-[320px]"
@@ -686,7 +716,19 @@ export default function TryOnStudio({ user }) {
                   </div>
                 ) : status === "success" && resultImage ? (
                   resultMediaType === "video" ? (
-                    <video src={resultImage} controls playsInline className="w-full h-full object-contain bg-black" />
+                    <video
+                      key={resultImage}
+                      src={resultImage}
+                      controls
+                      playsInline
+                      preload="metadata"
+                      className="w-full h-full min-h-[260px] object-contain bg-black"
+                      onError={() =>
+                        setResultVideoError(
+                          "This video URL loaded but the browser cannot decode it. Typical cause: OpenCV mp4v output. Install FFmpeg on the API server (see server logs) so the pipeline can re-encode to H.264, or try opening the link in Chrome."
+                        )
+                      }
+                    />
                   ) : (
                     <img src={resultImage} alt="Generated try-on" className="w-full h-full object-cover" />
                   )
