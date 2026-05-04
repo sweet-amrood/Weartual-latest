@@ -56,7 +56,8 @@ export const runDecartIrlPipeline = ({ videoPath, referenceImagePath, outputPath
     }
     const scriptPath = resolved;
 
-    const pythonBin = (process.env.DECART_PYTHON || "python").trim() || "python";
+    const defaultPy = process.platform === "win32" ? "python" : "python3";
+    const pythonBin = (process.env.DECART_PYTHON || defaultPy).trim() || defaultPy;
     const absVideo = path.resolve(videoPath);
     const absRef = path.resolve(referenceImagePath);
     const absOut = path.resolve(outputPath);

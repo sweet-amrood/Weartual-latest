@@ -1,0 +1,9 @@
+# Python deps for server/preprocessing/*.py (Decart image + IRL video on Render/Linux).
+#
+# Render (Web Service) — add to Build Command (example; paths depend on repo root):
+#   pip install --user -r server/requirements.txt
+#
+# Requires Python 3.10+ on the host (matches `decart`).
+# `realtime` extra pulls aiortc/av/etc. for irl.py WebRTC pipeline.
+
+decart[realtime]>=0.0.36

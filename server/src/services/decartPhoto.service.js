@@ -61,7 +61,8 @@ export const runDecartPhotoPipeline = ({
     }
     const scriptPath = resolved;
 
-    const pythonBin = (process.env.DECART_PYTHON || "python").trim() || "python";
+    const defaultPy = process.platform === "win32" ? "python" : "python3";
+    const pythonBin = (process.env.DECART_PYTHON || defaultPy).trim() || defaultPy;
     const absPerson = path.resolve(personImagePath);
     const absGarment = path.resolve(garmentImagePath);
     const absOut = path.resolve(outputPath);
