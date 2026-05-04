@@ -2,9 +2,13 @@ import { spawn } from "child_process";
 import fs from "fs/promises";
 import path from "path";
 import { accessSync, constants } from "fs";
+import { fileURLToPath } from "url";
 import AppError from "../utils/AppError.js";
 
 const DEFAULT_TIMEOUT_MS = 15 * 60 * 1000;
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const DEFAULT_IRL_SCRIPT_PATH = path.resolve(__dirname, "../../preprocessing/irl.py");
 
 /**
  * Runs the Decart IRL Python pipeline (irl.py): person video + garment reference image -> output MP4.
@@ -12,11 +16,7 @@ const DEFAULT_TIMEOUT_MS = 15 * 60 * 1000;
  */
 export const runDecartIrlPipeline = ({ videoPath, referenceImagePath, outputPath, timeoutMs = DEFAULT_TIMEOUT_MS }) =>
   new Promise((resolve, reject) => {
-    const scriptPath = (process.env.DECART_IRL_SCRIPT || "").trim();
-    if (!scriptPath) {
-      reject(new AppError("Server is not configured for video try-on (set DECART_IRL_SCRIPT).", 500));
-      return;
-    }
+    const scriptPath = (process.env.DECART_IRL_SCRIPT || DEFAULT_IRL_SCRIPT_PATH).trim();
 
     if (!(process.env.DECART_API_KEY || "").trim()) {
       reject(new AppError("DECART_API_KEY is not set (required for person video try-on).", 500));
@@ -26,7 +26,7 @@ export const runDecartIrlPipeline = ({ videoPath, referenceImagePath, outputPath
     try {
       accessSync(scriptPath, constants.R_OK);
     } catch {
-      reject(new AppError("DECART_IRL_SCRIPT points to a file that cannot be read.", 500));
+      reject(new AppError(`Decart IRL script cannot be read: ${scriptPath}`, 500));
       return;
     }
 
