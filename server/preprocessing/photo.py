@@ -12,9 +12,8 @@ from pathlib import Path
 from decart import DecartClient, models
 
 PROMPT = (
-    "Virtual try-on: apply the upper-body clothing style, colors, pattern, and fit from the reference garment "
-    "image onto the person in the main image. Keep the person's face, hair, skin, body proportions, pose, "
-    "hands, and background unchanged. Output a photorealistic result."
+    "change only the upper-body garment using the reference image, keeping face, hair, body, pose, and background exactly unchanged."
+
 )
 
 

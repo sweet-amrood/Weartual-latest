@@ -321,7 +321,8 @@ export default function TryOnStudio({ user }) {
         image: job.resultUrl,
         timestamp: outfitId,
         outfitId,
-        name: garment?.name ? `Try-on: ${garment.name}` : "Generated outfit look"
+        name: garment?.name ? `Try-on: ${garment.name}` : "Generated outfit look",
+        resultType: job.resultType === "video" || inferResultIsVideo(job) ? "video" : "image"
       });
       const candidateSuggestions = clothSamples.length
         ? clothSamples.map((sample) => ({ url: sample.url, name: sample.fileName || "Suggested cloth" }))

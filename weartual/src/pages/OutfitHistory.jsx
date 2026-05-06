@@ -9,6 +9,17 @@ const formatTimestamp = (iso) => {
   return date.toLocaleString();
 };
 
+const VIDEO_NAME_RE = /\.(mp4|webm|mov|m4v)$/i;
+
+/** Older history entries only stored `image` URL; infer video so thumbnails render. */
+const entryIsVideo = (entry) => {
+  if (entry?.resultType === "video" || entry?.mediaType === "video") return true;
+  const url = String(entry?.image || "");
+  if (VIDEO_NAME_RE.test(url)) return true;
+  if (/\/video\/upload\//.test(url)) return true;
+  return false;
+};
+
 export default function OutfitHistory({ user }) {
   const userId = useMemo(() => getAuthenticatedUserId(user), [user]);
   const [items, setItems] = useState([]);
@@ -61,7 +72,19 @@ export default function OutfitHistory({ user }) {
             {items.map((entry, idx) => (
               <article key={`${entry.timestamp}-${idx}`} className="rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-sm">
                 <div className="aspect-[4/5] bg-slate-100">
-                  <img src={entry.image} alt={entry.name || "Saved outfit"} className="w-full h-full object-cover" loading="lazy" />
+                  {entryIsVideo(entry) ? (
+                    <video
+                      src={entry.image}
+                      className="w-full h-full object-cover"
+                      controls
+                      muted
+                      playsInline
+                      preload="metadata"
+                      aria-label={entry.name || "Saved outfit video"}
+                    />
+                  ) : (
+                    <img src={entry.image} alt={entry.name || "Saved outfit"} className="w-full h-full object-cover" loading="lazy" />
+                  )}
                 </div>
                 <div className="p-4">
                   <h3 className="text-sm font-semibold text-slate-900 mb-2 line-clamp-2">{entry.name || "Generated outfit look"}</h3>

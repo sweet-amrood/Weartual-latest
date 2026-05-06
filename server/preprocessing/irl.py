@@ -105,7 +105,8 @@ async def wait_for_connection(client, timeout=15.0):
 async def connect_with_reference_image(client, model, track, reference_image_path):
     """Try initial-image connect first, then fall back to applying the image after connect."""
     prompt_text = (
-        "Apply the upper clothing style from the reference image to the person in the video. Keep face, body shape, pose, camera angle, and background unchanged."
+        "change only the upper-body garment using the reference image, keeping face, hair, body, pose, and background exactly unchanged."
+
     )
 
     base_options = dict(
