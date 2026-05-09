@@ -8,6 +8,8 @@ const sanitizeUser = (user) => ({
   id: user._id,
   username: user.username,
   email: user.email,
+  loginPlatform: user.loginPlatform,
+  totalLookCount: typeof user.totalLookCount === "number" && !Number.isNaN(user.totalLookCount) ? user.totalLookCount : 0,
   createdAt: user.createdAt
 });
 
@@ -39,7 +41,7 @@ export const signupService = async ({ username, email, password }) => {
   const existingUsername = await User.findOne({ username });
   if (existingUsername) throw new AppError("Username is already in use", 409);
 
-  const user = await User.create({ username, email, password });
+  const user = await User.create({ username, email, password, loginPlatform: "web" });
   const token = signJwt({ userId: user._id });
 
   return { token, user: sanitizeUser(user) };
@@ -51,6 +53,9 @@ export const loginService = async ({ email, password }) => {
 
   const isPasswordValid = await user.comparePassword(password);
   if (!isPasswordValid) throw new AppError("Invalid email or password", 401);
+
+  user.loginPlatform = "web";
+  await user.save();
 
   const token = signJwt({ userId: user._id });
 
@@ -115,8 +120,12 @@ export const googleAuthService = async ({ idToken }) => {
     user = await User.create({
       username,
       email,
-      password: randomPassword
+      password: randomPassword,
+      loginPlatform: "google"
     });
+  } else {
+    user.loginPlatform = "google";
+    await user.save();
   }
 
   const token = signJwt({ userId: user._id });

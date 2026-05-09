@@ -1,8 +1,16 @@
 import React, { useMemo, useRef, useState, useEffect } from "react";
-import { listDatasetSamples, uploadMyImage } from "../services/imageApi";
+import { listDatasetSamples, uploadMyImage, getMyLookCount, deleteMyImage, deleteMyImageByResultUrl } from "../services/imageApi";
 import { Sparkles, Trash2, Download, Maximize2, X, ArrowRight, ThumbsUp, ThumbsDown, Star, MessageCircle, Music2, Link2, Share2, Send } from "lucide-react";
 import StyleInsightsPanel from "../components/StyleInsightsPanel";
-import { addOutfitHistoryEntry, getAuthenticatedUserId, getOutfitRating, saveOutfitRating } from "../services/outfitHistory";
+import {
+  addOutfitHistoryEntry,
+  getAuthenticatedUserId,
+  getOutfitRating,
+  removeOutfitHistoryEntryByJobId,
+  removeOutfitHistoryEntriesWithImageUrl,
+  removeOutfitRatingByOutfitId,
+  saveOutfitRating
+} from "../services/outfitHistory";
 
 const PERSON_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const PERSON_VIDEO_TYPES = ["video/mp4", "video/webm", "video/quicktime"];
@@ -72,6 +80,8 @@ export default function TryOnStudio({ user }) {
   const [shareFeedback, setShareFeedback] = useState("");
   const [resultVideoError, setResultVideoError] = useState("");
   const [isImageFullscreenOpen, setIsImageFullscreenOpen] = useState(false);
+  const [lookCount, setLookCount] = useState(null);
+  const [currentJobId, setCurrentJobId] = useState(null);
   const heroTargetRef = useRef({ x: 50, y: 50 });
   const compareRef = useRef(null);
 
@@ -101,6 +111,24 @@ export default function TryOnStudio({ user }) {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    if (!user) {
+      setLookCount(null);
+      return undefined;
+    }
+    let cancelled = false;
+    getMyLookCount()
+      .then((data) => {
+        if (!cancelled && typeof data?.lookCount === "number") setLookCount(data.lookCount);
+      })
+      .catch(() => {
+        if (!cancelled) setLookCount(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
 
   useEffect(() => {
     if (typeof window === "undefined" || typeof window.matchMedia !== "function") return;
@@ -279,6 +307,8 @@ export default function TryOnStudio({ user }) {
     setResultImage(null);
     setResultMediaType("image");
     setResultVideoError("");
+    setCurrentJobId(null);
+    setCurrentOutfitId(null);
   };
 
   const useSample = async (type, sample) => {
@@ -298,6 +328,7 @@ export default function TryOnStudio({ user }) {
       setError("");
       setResultVideoError("");
       setStatus("analyzing");
+      setCurrentJobId(null);
       setActiveStageIndex(0);
       setStageVisible(true);
       const response = await uploadMyImage({ imageFile: person, garmentFile: garment });
@@ -317,10 +348,14 @@ export default function TryOnStudio({ user }) {
       setSelectedRating(null);
       setSelectedStars(0);
       setRatingLocked(false);
+      const resolvedJobIdRaw = job?.id ?? job?._id;
+      const resolvedJobId =
+        resolvedJobIdRaw != null && String(resolvedJobIdRaw).trim() !== "" ? String(resolvedJobIdRaw).trim() : null;
       addOutfitHistoryEntry(getAuthenticatedUserId(user), {
         image: job.resultUrl,
         timestamp: outfitId,
         outfitId,
+        jobId: resolvedJobId ?? undefined,
         name: garment?.name ? `Try-on: ${garment.name}` : "Generated outfit look",
         resultType: job.resultType === "video" || inferResultIsVideo(job) ? "video" : "image"
       });
@@ -328,6 +363,16 @@ export default function TryOnStudio({ user }) {
         ? clothSamples.map((sample) => ({ url: sample.url, name: sample.fileName || "Suggested cloth" }))
         : LOCAL_CLOTH_DATASET.map((url, idx) => ({ url, name: `Cloth ${idx + 1}` }));
       setImprovementSuggestions(pickRandomItems(candidateSuggestions, 4));
+      setCurrentJobId(resolvedJobId);
+      if (typeof response?.lookCount === "number") setLookCount(response.lookCount);
+      else {
+        try {
+          const c = await getMyLookCount();
+          if (typeof c?.lookCount === "number") setLookCount(c.lookCount);
+        } catch {
+          /* ignore */
+        }
+      }
     } catch (err) {
       setStatus("error");
       setError(err?.message || "Try-on generation failed.");
@@ -337,6 +382,58 @@ export default function TryOnStudio({ user }) {
   const runTryOn = async () => {
     if (!personFile || !garmentFile) return setError("Upload both person and garment images first.");
     await executeTryOn({ person: personFile, garment: garmentFile });
+  };
+
+  const deleteCurrentResultFromServer = async () => {
+    const jobId = String(currentJobId || "").trim();
+    if (!jobId) {
+      setError("No saved result id — generate a try-on again, then delete.");
+      return;
+    }
+    const uid = getAuthenticatedUserId(user);
+    if (uid === "anonymous") {
+      setError("Sign in to remove this result from your account.");
+      return;
+    }
+    if (!window.confirm("Delete this result from your account? It will be removed from the server and cannot be undone.")) return;
+    try {
+      setError("");
+      let data;
+      try {
+        data = await deleteMyImage(jobId);
+      } catch (err) {
+        const msg = String(err?.message || "");
+        const is404 = /not found|404|Job not found/i.test(msg);
+        if (is404 && resultImage && /^https?:\/\//i.test(String(resultImage).trim())) {
+          data = await deleteMyImageByResultUrl(String(resultImage).trim());
+        } else {
+          throw err;
+        }
+      }
+      removeOutfitHistoryEntryByJobId(uid, jobId);
+      if (resultImage) removeOutfitHistoryEntriesWithImageUrl(uid, String(resultImage).trim());
+      if (currentOutfitId) removeOutfitRatingByOutfitId(uid, currentOutfitId);
+      if (typeof data?.lookCount === "number") setLookCount(data.lookCount);
+      try {
+        const fresh = await getMyLookCount();
+        if (typeof fresh?.lookCount === "number") setLookCount(fresh.lookCount);
+      } catch {
+        /* ignore */
+      }
+      setCurrentJobId(null);
+      setCurrentOutfitId(null);
+      setResultImage(null);
+      setResultVideoError("");
+      setStatus("idle");
+      setComparePosition(50);
+      setSelectedRating(null);
+      setSelectedStars(0);
+      setRatingLocked(false);
+      setShareFeedback("");
+      setImprovementSuggestions([]);
+    } catch (err) {
+      setError(err?.message || "Could not delete this result from the server.");
+    }
   };
 
   const clearType = (type) => {
@@ -587,9 +684,25 @@ export default function TryOnStudio({ user }) {
               }`}
             >
               <div className="flex flex-wrap items-center justify-between gap-2 px-1 pb-2">
-                <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-500">Result Preview</h3>
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                  <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-500">Result Preview</h3>
+                  {getAuthenticatedUserId(user) !== "anonymous" && lookCount !== null && (
+                    <span className="text-xs font-medium text-slate-600 tabular-nums rounded-full border border-slate-200 bg-slate-50 px-2.5 py-0.5">
+                      Your looks: {lookCount}
+                    </span>
+                  )}
+                </div>
                 {status === "success" && resultImage && (
                   <div className="flex flex-wrap items-center justify-end gap-2 w-full sm:w-auto">
+                    {currentJobId ? (
+                      <button
+                        type="button"
+                        onClick={deleteCurrentResultFromServer}
+                        className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg border border-rose-200 bg-rose-50 text-rose-700 text-xs font-semibold hover:bg-rose-100 transition-colors"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" /> Delete from server
+                      </button>
+                    ) : null}
                     <button
                       type="button"
                       onClick={downloadCurrentResult}

@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import AppError from "../utils/AppError.js";
 import UploadedImage from "../models/UploadedImage.js";
+import User from "../models/User.js";
 import cloudinary from "../config/cloudinary.js";
 import fs from "fs/promises";
 import path from "path";
@@ -47,8 +48,8 @@ const SAMPLE_DATASET_FOLDERS = {
 const SAMPLE_FILE_EXTENSIONS = new Set([".jpg", ".jpeg", ".png", ".webp"]);
 
 const toClientImage = (doc) => ({
-  id: doc._id,
-  userId: doc.userId,
+  id: doc._id != null ? String(doc._id) : null,
+  userId: doc.userId != null ? String(doc.userId) : null,
   imageFilename: doc.imageFilename,
   garmentFilename: doc.garmentFilename,
   imageUrl: doc.imageUrl,
@@ -398,7 +399,9 @@ export const uploadImageService = async ({ userId, imageFile, garmentFile }) => 
       status: job.status
     });
 
-    return toClientImage(job);
+    const lookCount = await syncAccountLookCountFromJobs(userId);
+
+    return { job: toClientImage(job), lookCount };
   } catch (error) {
     if (error instanceof AppError) throw error;
     console.error("[images][cloudinary] Upload pipeline failed:", error?.message || error);
@@ -409,6 +412,56 @@ export const uploadImageService = async ({ userId, imageFile, garmentFile }) => 
 export const listMyImagesService = async (userId) => {
   const docs = await UploadedImage.find({ userId }).sort({ createdAt: -1 }).limit(50);
   return docs.map(toClientImage);
+};
+
+const toObjectId = (value, label) => {
+  const s = String(value ?? "").trim();
+  if (!mongoose.isValidObjectId(s)) {
+    throw new AppError(`Invalid ${label}`, 400);
+  }
+  return new mongoose.Types.ObjectId(s);
+};
+
+/** Persists how many try-on jobs this account has and returns that number (scoped to `userId` only). */
+const syncAccountLookCountFromJobs = async (userId) => {
+  const uid = toObjectId(userId, "user id");
+  const c = await UploadedImage.countDocuments({ userId: uid });
+  const res = await User.updateOne({ _id: uid }, { $set: { totalLookCount: c } });
+  if (res.matchedCount === 0) throw new AppError("User not found", 404);
+  return c;
+};
+
+export const getAccountLookCountService = async (userId) => syncAccountLookCountFromJobs(userId);
+
+export const deleteMyImageService = async (userId, jobId) => {
+  const jid = toObjectId(jobId, "job id");
+  const uid = toObjectId(userId, "user id");
+  const deleted = await UploadedImage.findOneAndDelete({ _id: jid, userId: uid });
+  if (!deleted) {
+    throw new AppError("Job not found", 404);
+  }
+  const lookCount = await syncAccountLookCountFromJobs(userId);
+  return { deleted: true, lookCount };
+};
+
+/** When the client only has the result URL (older history rows), match `UploadedImage.resultUrl`. */
+export const deleteMyImageByResultUrlService = async (userId, resultUrl) => {
+  const url = String(resultUrl || "").trim();
+  if (!url || !/^https?:\/\//i.test(url)) {
+    throw new AppError("Valid result URL is required", 400);
+  }
+  const uid = toObjectId(userId, "user id");
+  const noQuery = url.split("?")[0];
+  const urlVariants = noQuery && noQuery !== url ? [url, noQuery] : [url];
+  const deleted = await UploadedImage.findOneAndDelete({
+    userId: uid,
+    resultUrl: { $in: urlVariants }
+  });
+  if (!deleted) {
+    throw new AppError("Job not found", 404);
+  }
+  const lookCount = await syncAccountLookCountFromJobs(userId);
+  return { deleted: true, lookCount };
 };
 
 export const listDatasetSamplesService = async (type, offset = 0) => {

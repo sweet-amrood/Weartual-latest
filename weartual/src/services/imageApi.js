@@ -12,6 +12,18 @@ const requestJson = async (path, options = {}) => {
 
 export const listMyImages = () => requestJson("/api/images/me", { method: "GET" });
 
+export const getMyLookCount = () => requestJson("/api/images/me/look-count", { method: "GET" });
+
+export const deleteMyImage = (jobId) =>
+  requestJson(`/api/images/me/${encodeURIComponent(jobId)}`, { method: "DELETE" });
+
+export const deleteMyImageByResultUrl = (resultUrl) =>
+  requestJson("/api/images/me/delete-by-result", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ resultUrl })
+  });
+
 export const uploadMyImage = async ({ imageFile, garmentFile }) => {
   const form = new FormData();
   form.append("image", imageFile);

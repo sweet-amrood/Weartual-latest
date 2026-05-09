@@ -19,6 +19,11 @@ const userSchema = new mongoose.Schema(
       lowercase: true,
       trim: true
     },
+    loginPlatform: {
+      type: String,
+      enum: ["web", "google"],
+      default: "web"
+    },
     password: {
       type: String,
       required: true,
@@ -32,6 +37,11 @@ const userSchema = new mongoose.Schema(
     resetPasswordExpires: {
       type: Date,
       default: null
+    },
+    totalLookCount: {
+      type: Number,
+      default: 0,
+      min: 0
     }
   },
   { timestamps: true }

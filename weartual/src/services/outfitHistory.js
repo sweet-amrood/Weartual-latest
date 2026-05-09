@@ -36,6 +36,43 @@ export const addOutfitHistoryEntry = (userId, entry) => {
   return next;
 };
 
+export const removeOutfitHistoryEntryAt = (userId, index) => {
+  if (typeof window === "undefined") return [];
+  const current = getOutfitHistory(userId);
+  if (!Number.isInteger(index) || index < 0 || index >= current.length) return current;
+  const next = current.filter((_, i) => i !== index);
+  window.localStorage.setItem(getOutfitHistoryKey(userId), JSON.stringify(next));
+  return next;
+};
+
+export const removeOutfitHistoryEntryByJobId = (userId, jobId) => {
+  if (typeof window === "undefined" || jobId == null || String(jobId).trim() === "") return [];
+  const id = String(jobId);
+  const current = getOutfitHistory(userId);
+  const next = current.filter((entry) => String(entry?.jobId || "") !== id);
+  window.localStorage.setItem(getOutfitHistoryKey(userId), JSON.stringify(next));
+  return next;
+};
+
+/** Remove every history row that points at the same result URL (e.g. after server delete by URL). */
+export const removeOutfitHistoryEntriesWithImageUrl = (userId, imageUrl) => {
+  if (typeof window === "undefined" || imageUrl == null) return [];
+  const target = String(imageUrl).trim().split("?")[0];
+  if (!target) return [];
+  const current = getOutfitHistory(userId);
+  const next = current.filter((entry) => String(entry?.image || "").trim().split("?")[0] !== target);
+  window.localStorage.setItem(getOutfitHistoryKey(userId), JSON.stringify(next));
+  return next;
+};
+
+export const removeOutfitRatingByOutfitId = (userId, outfitId) => {
+  if (typeof window === "undefined" || !outfitId) return [];
+  const ratings = getOutfitRatings(userId);
+  const next = ratings.filter((item) => item.outfitId !== outfitId);
+  window.localStorage.setItem(getOutfitRatingsKey(userId), JSON.stringify(next));
+  return next;
+};
+
 export const getOutfitRatingsKey = (userId) => `outfit_ratings_${userId}`;
 
 export const getOutfitRatings = (userId) => {
