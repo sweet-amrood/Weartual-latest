@@ -18,9 +18,10 @@ import {
   getOutfitHistory,
   getOutfitRatings,
   removeOutfitHistoryEntryAt,
-  removeOutfitRatingByOutfitId
+  removeOutfitRatingByOutfitId,
+  setOutfitHistory
 } from "../services/outfitHistory";
-import { deleteMyImage, deleteMyImageByResultUrl, getMyLookCount } from "../services/imageApi";
+import { deleteMyImage, deleteMyImageByResultUrl, getMyLookCount, listMyImages } from "../services/imageApi";
 
 const HISTORY_JOB_ID_RE = /^[a-f0-9]{24}$/i;
 
@@ -69,6 +70,72 @@ const sameHistoryEntry = (a, b) => {
   return a.timestamp === b.timestamp && String(a.image || "") === String(b.image || "");
 };
 
+const stripUrlQuery = (u) => String(u || "").trim().split("?")[0];
+
+/** Build a history row from an API job (`listMyImages`). */
+const serverJobToHistoryEntry = (job) => {
+  const id = job?.id != null ? String(job.id).trim() : null;
+  const rawTs = job?.processedAt || job?.createdAt || job?.updatedAt;
+  const timestamp =
+    typeof rawTs === "string"
+      ? rawTs
+      : rawTs && typeof rawTs.toISOString === "function"
+        ? rawTs.toISOString()
+        : new Date().toISOString();
+  const garment = String(job?.garmentFilename || "").trim();
+  return {
+    image: String(job?.resultUrl || "").trim(),
+    timestamp,
+    outfitId: id || timestamp,
+    jobId: id || undefined,
+    name: garment ? `Try-on: ${garment}` : "Generated outfit look",
+    resultType: job?.resultType === "video" ? "video" : "image"
+  };
+};
+
+/** Dedupe keys for one history row (job id, image URL, client outfit id). */
+const historyDedupeKeys = (entry) => {
+  const keys = [];
+  const jid = normalizeHistoryJobId(entry);
+  if (jid) keys.push(`job:${jid}`);
+  const img = stripUrlQuery(entry?.image);
+  if (img) keys.push(`img:${img}`);
+  const oid = entry?.outfitId != null ? String(entry.outfitId).trim() : "";
+  if (oid) keys.push(`outfit:${oid}`);
+  return keys;
+};
+
+/** Merge server-backed jobs with any local-only rows so history works across browsers. */
+const mergeServerAndLocalHistory = (serverJobs, localEntries) => {
+  const seen = new Set();
+  const merged = [];
+
+  const consume = (entry) => {
+    if (!entry?.image || String(entry.image).trim().length === 0) return;
+    const klist = historyDedupeKeys(entry);
+    if (klist.some((k) => seen.has(k))) return;
+    klist.forEach((k) => seen.add(k));
+    merged.push(entry);
+  };
+
+  const serverList = Array.isArray(serverJobs) ? serverJobs : [];
+  for (const job of serverList) {
+    if (!String(job?.resultUrl || "").trim()) continue;
+    consume(serverJobToHistoryEntry(job));
+  }
+
+  for (const e of Array.isArray(localEntries) ? localEntries : []) {
+    consume(e);
+  }
+
+  merged.sort((a, b) => {
+    const ta = new Date(a.timestamp || 0).getTime();
+    const tb = new Date(b.timestamp || 0).getTime();
+    return tb - ta;
+  });
+  return merged;
+};
+
 const IMAGE_ZOOM_MIN = 0.5;
 const IMAGE_ZOOM_MAX = 3;
 const IMAGE_ZOOM_STEP = 0.25;
@@ -98,9 +165,35 @@ export default function OutfitHistory({ user }) {
     setRatingsByOutfitId(ratingsToMap(getOutfitRatings(userId)));
   }, [userId]);
 
+  /** Load local rows, then hydrate from server so count and list stay in sync across devices. */
   useEffect(() => {
-    refreshFromStorage();
-  }, [refreshFromStorage]);
+    const local = getOutfitHistory(userId);
+    setItems(local);
+    setRatingsByOutfitId(ratingsToMap(getOutfitRatings(userId)));
+
+    if (!userId || userId === "anonymous") {
+      return undefined;
+    }
+
+    let cancelled = false;
+    listMyImages()
+      .then((data) => {
+        if (cancelled) return;
+        const serverJobs = Array.isArray(data?.images) ? data.images : [];
+        const merged = mergeServerAndLocalHistory(serverJobs, local);
+        setItems(merged);
+        setOutfitHistory(userId, merged);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          /* keep local-only list */
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
 
   useEffect(() => {
     if (!user) {

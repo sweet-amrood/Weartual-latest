@@ -36,6 +36,16 @@ export const addOutfitHistoryEntry = (userId, entry) => {
   return next;
 };
 
+/** Replace saved history for this user (used after merging server jobs with local rows). */
+export const setOutfitHistory = (userId, entries) => {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(getOutfitHistoryKey(userId), JSON.stringify(Array.isArray(entries) ? entries : []));
+  } catch {
+    /* ignore quota / private mode */
+  }
+};
+
 export const removeOutfitHistoryEntryAt = (userId, index) => {
   if (typeof window === "undefined") return [];
   const current = getOutfitHistory(userId);
