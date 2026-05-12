@@ -8,10 +8,16 @@ import { errorHandler, notFound } from "./middlewares/error.middleware.js";
 
 const app = express();
 
-const allowedOrigins = String(process.env.CLIENT_URL || "")
-  .split(",")
-  .map((origin) => origin.trim())
-  .filter(Boolean);
+const allowedOrigins = [
+  ...String(process.env.CLIENT_URL || "")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean),
+  ...String(process.env.MOBILE_APP_ORIGINS || "")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean)
+].filter((v, i, a) => a.indexOf(v) === i);
 
 app.use(cors({
   origin: allowedOrigins,

@@ -5,7 +5,10 @@ import {
   googleAuthService,
   loginService,
   resetPasswordService,
-  signupService
+  signupService,
+  updateMeNotificationSettingsService,
+  updateMeProfileService,
+  uploadMeAvatarService
 } from "../services/auth.service.js";
 import { cookieOptions } from "../utils/token.js";
 import { dispatchEmailSafely } from "../utils/dispatchEmail.js";
@@ -123,5 +126,24 @@ export const resetPassword = asyncHandler(async (req, res) => {
 
 export const getCurrentUser = asyncHandler(async (req, res) => {
   const user = await getCurrentUserService(req.user.userId);
+  res.status(200).json({ success: true, user });
+});
+
+export const patchMe = asyncHandler(async (req, res) => {
+  const { user, token } = await updateMeProfileService(req.user.userId, req.body);
+  res.cookie("token", token, cookieOptions);
+  res.status(200).json({ success: true, user, token });
+});
+
+export const uploadMeAvatar = asyncHandler(async (req, res) => {
+  const { user } = await uploadMeAvatarService(req.user.userId, req.file);
+  res.status(200).json({ success: true, user });
+});
+
+export const updateMeNotifications = asyncHandler(async (req, res) => {
+  const { user } = await updateMeNotificationSettingsService(req.user.userId, {
+    enabled: req.body.enabled,
+    expoPushToken: req.body.expoPushToken
+  });
   res.status(200).json({ success: true, user });
 });

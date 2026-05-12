@@ -42,6 +42,26 @@ const userSchema = new mongoose.Schema(
       type: Number,
       default: 0,
       min: 0
+    },
+    avatarUrl: {
+      type: String,
+      default: null,
+      maxlength: 2048
+    },
+    avatarPreset: {
+      type: String,
+      default: null,
+      maxlength: 64
+    },
+    /** Single Expo push token for the mobile app (see POST /api/auth/me/notifications). */
+    expoPushToken: {
+      type: String,
+      default: null,
+      maxlength: 512
+    },
+    notificationsEnabled: {
+      type: Boolean,
+      default: false
     }
   },
   { timestamps: true }

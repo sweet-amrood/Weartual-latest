@@ -5,6 +5,8 @@ import AppError from "../utils/AppError.js";
 import { signJwt } from "../utils/token.js";
 import { dispatchEmailSafely } from "../utils/dispatchEmail.js";
 import { buildPasswordResetEmail } from "../utils/emailTemplates.js";
+import cloudinary from "../config/cloudinary.js";
+import { assertValidExpoPushToken } from "./notifications.service.js";
 
 const sanitizeUser = (user) => ({
   id: user._id,
@@ -12,6 +14,9 @@ const sanitizeUser = (user) => ({
   email: user.email,
   loginPlatform: user.loginPlatform,
   totalLookCount: typeof user.totalLookCount === "number" && !Number.isNaN(user.totalLookCount) ? user.totalLookCount : 0,
+  avatarUrl: user.avatarUrl ?? null,
+  avatarPreset: user.avatarPreset ?? null,
+  notificationsEnabled: Boolean(user.notificationsEnabled),
   createdAt: user.createdAt
 });
 
@@ -193,4 +198,133 @@ export const getCurrentUserService = async (userId) => {
   const user = await User.findById(userId);
   if (!user) throw new AppError("User not found", 404);
   return sanitizeUser(user);
+};
+
+const uploadAvatarBufferToCloudinary = (buffer, userId, originalName) =>
+  new Promise((resolve, reject) => {
+    const safeName = String(originalName || "avatar.jpg").replace(/[^\w.\-]/g, "_");
+    const stream = cloudinary.uploader.upload_stream(
+      {
+        folder: `weartual/avatars/${userId}`,
+        resource_type: "image",
+        public_id: `avatar_${Date.now()}`,
+        use_filename: false,
+        unique_filename: true,
+        overwrite: false,
+        filename_override: safeName
+      },
+      (error, result) => {
+        if (error) return reject(error);
+        return resolve(result);
+      }
+    );
+    stream.end(buffer);
+  });
+
+/**
+ * PATCH /api/auth/me — partial profile update.
+ * currentPassword required when changing username or email.
+ */
+export const updateMeProfileService = async (userId, body) => {
+  const { username, email, currentPassword, avatarPreset, avatarUrl } = body;
+  const user = await User.findById(userId).select("+password");
+  if (!user) throw new AppError("User not found", 404);
+
+  const wantsUsernameChange =
+    username !== undefined && String(username).trim() !== user.username;
+  const wantsEmailChange =
+    email !== undefined && String(email).trim().toLowerCase() !== user.email;
+
+  if (wantsUsernameChange || wantsEmailChange) {
+    if (!currentPassword || typeof currentPassword !== "string") {
+      throw new AppError("currentPassword is required to change email or username", 400);
+    }
+    const ok = await user.comparePassword(currentPassword);
+    if (!ok) throw new AppError("Current password is incorrect", 401);
+  }
+
+  if (wantsUsernameChange) {
+    const nu = String(username).trim();
+    if (nu.length < 3 || nu.length > 30) {
+      throw new AppError("Username must be 3–30 characters", 400);
+    }
+    const taken = await User.findOne({ username: nu, _id: { $ne: user._id } });
+    if (taken) throw new AppError("Username is already in use", 409);
+    user.username = nu;
+  }
+
+  if (wantsEmailChange) {
+    const ne = String(email).trim().toLowerCase();
+    const taken = await User.findOne({ email: ne, _id: { $ne: user._id } });
+    if (taken) throw new AppError("Email is already in use", 409);
+    user.email = ne;
+  }
+
+  if (avatarPreset !== undefined) {
+    user.avatarPreset =
+      avatarPreset === null || avatarPreset === ""
+        ? null
+        : String(avatarPreset).trim().slice(0, 64) || null;
+  }
+
+  if (avatarUrl !== undefined) {
+    user.avatarUrl =
+      avatarUrl === null || avatarUrl === ""
+        ? null
+        : String(avatarUrl).trim().slice(0, 2048) || null;
+  }
+
+  await user.save();
+  const fresh = await User.findById(userId);
+  const token = signJwt({ userId: user._id });
+  return { user: sanitizeUser(fresh), token };
+};
+
+const AVATAR_MIME = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
+
+/** POST /api/auth/me/avatar — multipart field `avatar`. */
+export const uploadMeAvatarService = async (userId, file) => {
+  if (!file?.buffer?.length) throw new AppError("Avatar file is required", 400);
+  const mt = String(file.mimetype || "").toLowerCase();
+  if (!AVATAR_MIME.has(mt)) {
+    throw new AppError("Avatar must be JPEG, PNG, WebP, or GIF", 400);
+  }
+  if (file.size > 5 * 1024 * 1024) throw new AppError("Avatar must be at most 5MB", 400);
+
+  const result = await uploadAvatarBufferToCloudinary(file.buffer, userId, file.originalname);
+  const url = result?.secure_url;
+  if (!url) throw new AppError("Avatar upload failed", 500);
+
+  const user = await User.findById(userId);
+  if (!user) throw new AppError("User not found", 404);
+  user.avatarUrl = url;
+  user.avatarPreset = null;
+  await user.save();
+
+  const fresh = await User.findById(userId);
+  return { user: sanitizeUser(fresh) };
+};
+
+/**
+ * POST /api/auth/me/notifications — { enabled, expoPushToken? | null }
+ */
+export const updateMeNotificationSettingsService = async (userId, { enabled, expoPushToken }) => {
+  const user = await User.findById(userId);
+  if (!user) throw new AppError("User not found", 404);
+
+  user.notificationsEnabled = Boolean(enabled);
+
+  if (enabled === false) {
+    user.expoPushToken = null;
+  } else if (expoPushToken !== undefined) {
+    if (expoPushToken === null || expoPushToken === "") {
+      user.expoPushToken = null;
+    } else {
+      user.expoPushToken = assertValidExpoPushToken(expoPushToken);
+    }
+  }
+
+  await user.save();
+  const fresh = await User.findById(userId);
+  return { user: sanitizeUser(fresh) };
 };
