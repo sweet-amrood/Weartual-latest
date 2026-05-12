@@ -1,4 +1,5 @@
-import React, { useMemo, useRef, useState, useEffect } from "react";
+import React, { useMemo, useRef, useState, useEffect, useLayoutEffect, useCallback } from "react";
+import { Link } from "react-router-dom";
 import { listDatasetSamples, uploadMyImage, deleteMyImage, deleteMyImageByResultUrl } from "../services/imageApi";
 import {
   Sparkles,
@@ -20,7 +21,10 @@ import {
   Layers,
   Cpu,
   Box,
-  Wand2
+  Wand2,
+  ZoomIn,
+  ZoomOut,
+  RotateCcw
 } from "lucide-react";
 import StyleInsightsPanel from "../components/StyleInsightsPanel";
 import {
@@ -65,6 +69,13 @@ const pickRandomItems = (items, count = 4) => {
 const VIDEO_NAME_RE = /\.(mp4|webm|mov|m4v)$/i;
 const IMAGE_NAME_RE = /\.(jpe?g|png|webp)$/i;
 
+const FS_ZOOM_MIN = 0.5;
+const FS_ZOOM_MAX = 3;
+const FS_ZOOM_STEP = 0.25;
+
+/** Matches server / client copy for try-on when not authenticated. */
+const AUTH_TRY_ON_ERROR_RE = /please create an account or log in to use try-on generation/i;
+
 /** Floating “tool collection” chips — Antigravity-style hero dock (positions %, parallax multiplier, animation delay). */
 const HERO_DOCK_ITEMS = [
   { Icon: Sparkles, top: "10%", left: "6%", delay: "0s", mul: 0.42 },
@@ -93,6 +104,8 @@ export default function TryOnStudio({ user }) {
   const [personMediaType, setPersonMediaType] = useState("image");
   const [status, setStatus] = useState("idle");
   const [error, setError] = useState("");
+  /** After first Generate (or suggestion try-on), show centered output + loading/result. */
+  const [showOutputSection, setShowOutputSection] = useState(false);
   const [resultImage, setResultImage] = useState(null);
   const [resultMediaType, setResultMediaType] = useState("image");
   const [resultFilename, setResultFilename] = useState("weartual-sys-output.jpg");
@@ -117,6 +130,14 @@ export default function TryOnStudio({ user }) {
   const [shareFeedback, setShareFeedback] = useState("");
   const [resultVideoError, setResultVideoError] = useState("");
   const [isImageFullscreenOpen, setIsImageFullscreenOpen] = useState(false);
+  const [fullscreenZoom, setFullscreenZoom] = useState(1);
+  const [fullscreenNatural, setFullscreenNatural] = useState(null);
+  const [fullscreenViewport, setFullscreenViewport] = useState({ w: 0, h: 0 });
+  const fullscreenScrollRef = useRef(null);
+  const fsZoomRef = useRef(1);
+  const pinchRef = useRef(null);
+  const pinchMovedRef = useRef(false);
+  const lastTapRef = useRef({ t: 0, x: 0, y: 0 });
   const [currentJobId, setCurrentJobId] = useState(null);
   const heroTargetRef = useRef({ x: 50, y: 50 });
   const compareRef = useRef(null);
@@ -125,6 +146,149 @@ export default function TryOnStudio({ user }) {
   const garmentInputRef = useRef(null);
   const isProcessing = useMemo(() => status === "analyzing", [status]);
   const canRun = !!personPreview && !!garmentPreview && !isProcessing;
+
+  useEffect(() => {
+    fsZoomRef.current = fullscreenZoom;
+  }, [fullscreenZoom]);
+
+  useEffect(() => {
+    if (!isImageFullscreenOpen) return undefined;
+    setFullscreenZoom(1);
+    setFullscreenNatural(null);
+    setFullscreenViewport({ w: 0, h: 0 });
+    pinchRef.current = null;
+    pinchMovedRef.current = false;
+    lastTapRef.current = { t: 0, x: 0, y: 0 };
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [isImageFullscreenOpen]);
+
+  useLayoutEffect(() => {
+    if (!isImageFullscreenOpen || !resultImage || resultMediaType !== "image") return undefined;
+    const el = fullscreenScrollRef.current;
+    if (!el) return undefined;
+    const measure = () => {
+      const w = el.clientWidth;
+      const h = el.clientHeight;
+      setFullscreenViewport((prev) => (prev.w === w && prev.h === h ? prev : { w, h }));
+    };
+    measure();
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(measure) : null;
+    ro?.observe(el);
+    window.addEventListener("resize", measure);
+    return () => {
+      ro?.disconnect();
+      window.removeEventListener("resize", measure);
+    };
+  }, [isImageFullscreenOpen, resultImage, resultMediaType]);
+
+  const fullscreenImageLayout = useMemo(() => {
+    if (!resultImage || !fullscreenNatural) {
+      return { ready: false, displayW: 0, displayH: 0 };
+    }
+    const nw = fullscreenNatural.w;
+    const nh = fullscreenNatural.h;
+    const vw = fullscreenViewport.w;
+    const vh = fullscreenViewport.h;
+    if (nw <= 0 || nh <= 0 || vw <= 0 || vh <= 0) {
+      return { ready: false, displayW: 0, displayH: 0 };
+    }
+    const fitScale = Math.min(vw / nw, vh / nh);
+    const displayW = nw * fitScale * fullscreenZoom;
+    const displayH = nh * fitScale * fullscreenZoom;
+    return { ready: true, displayW, displayH };
+  }, [resultImage, fullscreenNatural, fullscreenViewport, fullscreenZoom]);
+
+  useEffect(() => {
+    if (!isImageFullscreenOpen || resultMediaType !== "image") return undefined;
+    const el = fullscreenScrollRef.current;
+    if (!el) return undefined;
+    const onWheel = (e) => {
+      if (!e.ctrlKey) return;
+      e.preventDefault();
+      const factor = Math.exp(-e.deltaY * 0.002);
+      setFullscreenZoom((z) => Math.min(FS_ZOOM_MAX, Math.max(FS_ZOOM_MIN, z * factor)));
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, [isImageFullscreenOpen, resultMediaType]);
+
+  useEffect(() => {
+    if (!isImageFullscreenOpen) return undefined;
+    const onKey = (e) => {
+      if (e.key === "Escape") setIsImageFullscreenOpen(false);
+      if (resultMediaType !== "image") return;
+      if (e.key === "+" || e.key === "=") {
+        e.preventDefault();
+        setFullscreenZoom((z) => Math.min(FS_ZOOM_MAX, Math.round((z + FS_ZOOM_STEP) * 100) / 100));
+      }
+      if (e.key === "-" || e.key === "_") {
+        e.preventDefault();
+        setFullscreenZoom((z) => Math.max(FS_ZOOM_MIN, Math.round((z - FS_ZOOM_STEP) * 100) / 100));
+      }
+      if (e.key === "0" && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        setFullscreenZoom(1);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [isImageFullscreenOpen, resultMediaType]);
+
+  const handleFsTouchStart = useCallback((e) => {
+    if (e.touches.length === 2) {
+      const [a, b] = [e.touches[0], e.touches[1]];
+      const dist = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+      pinchRef.current = { dist, zoom: fsZoomRef.current };
+      pinchMovedRef.current = false;
+    }
+  }, []);
+
+  const handleFsTouchMove = useCallback((e) => {
+    if (e.touches.length !== 2 || !pinchRef.current) return;
+    e.preventDefault();
+    pinchMovedRef.current = true;
+    const [a, b] = [e.touches[0], e.touches[1]];
+    const dist = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+    const baseDist = pinchRef.current.dist;
+    if (baseDist < 8) return;
+    const ratio = dist / baseDist;
+    const newZoom = Math.min(FS_ZOOM_MAX, Math.max(FS_ZOOM_MIN, pinchRef.current.zoom * ratio));
+    pinchRef.current = { dist, zoom: newZoom };
+    setFullscreenZoom(newZoom);
+  }, []);
+
+  const handleFsTouchEnd = useCallback((e) => {
+    if (e.touches.length > 0) {
+      if (e.touches.length < 2) pinchRef.current = null;
+      return;
+    }
+    if (e.changedTouches.length !== 1) {
+      pinchRef.current = null;
+      lastTapRef.current = { t: 0, x: 0, y: 0 };
+      return;
+    }
+    if (pinchMovedRef.current) {
+      pinchMovedRef.current = false;
+      pinchRef.current = null;
+      lastTapRef.current = { t: 0, x: 0, y: 0 };
+      return;
+    }
+    const tch = e.changedTouches[0];
+    const now = Date.now();
+    const prev = lastTapRef.current;
+    const dt = now - prev.t;
+    if (dt > 30 && dt < 380 && Math.hypot(tch.clientX - prev.x, tch.clientY - prev.y) < 56) {
+      setFullscreenZoom((z) => (z > 1.05 ? 1 : Math.min(2, FS_ZOOM_MAX)));
+      lastTapRef.current = { t: 0, x: 0, y: 0 };
+    } else {
+      lastTapRef.current = { t: now, x: tch.clientX, y: tch.clientY };
+    }
+    pinchRef.current = null;
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -392,12 +556,17 @@ export default function TryOnStudio({ user }) {
       setCurrentJobId(resolvedJobId);
     } catch (err) {
       setStatus("error");
-      setError(err?.message || "Try-on generation failed.");
+      const msg = String(err?.message || "");
+      const authLike =
+        /please create an account or log in/i.test(msg) ||
+        /authentication required|invalid or expired token|unauthorized|^401\b/i.test(msg);
+      setError(authLike ? "Please create an account or log in to use try-on generation." : msg || "Try-on generation failed.");
     }
   };
 
   const runTryOn = async () => {
     if (!personFile || !garmentFile) return setError("Upload both person and garment images first.");
+    setShowOutputSection(true);
     await executeTryOn({ person: personFile, garment: garmentFile });
   };
 
@@ -495,6 +664,7 @@ export default function TryOnStudio({ user }) {
 
   const handleSuggestionClick = async (suggestion) => {
     if (!personFile || !suggestion?.url || isProcessing) return;
+    setShowOutputSection(true);
     try {
       const response = await fetch(suggestion.url);
       const blob = await response.blob();
@@ -652,67 +822,112 @@ export default function TryOnStudio({ user }) {
             </p>
           </div>
         </div>
-        {error && <div className="mb-4 rounded-xl border border-red-200 bg-red-50 text-red-700 p-3 text-sm">{error}</div>}
-
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 lg:h-[calc(100vh-390px)] lg:min-h-[520px]">
-          <div className="lg:col-span-5 flex flex-col gap-4 lg:overflow-auto pr-1">
-            {[
-              { key: "person", title: "Person Input (Image/Video)", preview: personPreview, ref: personInputRef, samples: personSamples },
-              { key: "garment", title: "Garment Image", preview: garmentPreview, ref: garmentInputRef, samples: clothSamples }
-            ].map((block) => (
-              <div key={block.key} className="rounded-2xl border border-slate-200 bg-white p-4">
-                <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-500 mb-3">{block.title}</h3>
-                <div className="relative rounded-2xl border border-slate-200 bg-slate-50 min-h-[170px] sm:min-h-[190px] overflow-hidden" onClick={() => !block.preview && block.ref.current?.click()}>
-                  <input
-                    ref={block.ref}
-                    type="file"
-                    className="hidden"
-                    accept={block.key === "person" ? "image/jpeg,image/png,image/webp,video/mp4,video/webm,video/quicktime" : "image/jpeg,image/png,image/webp"}
-                    onChange={(e) => setPreview(block.key, e.target.files?.[0] || null)}
-                  />
-                  {block.preview ? (
-                    <>
-                      {block.key === "person" && personMediaType === "video" ? (
-                        <video src={block.preview} className="w-full h-full object-contain bg-slate-50" controls muted playsInline />
-                      ) : (
-                        <img src={block.preview} alt={block.title} className="w-full h-full object-contain bg-slate-50" />
-                      )}
-                      <button onClick={(e) => { e.stopPropagation(); clearType(block.key); }} className="absolute top-3 right-3 p-2 rounded-lg bg-white border border-slate-200 text-slate-700">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </>
-                  ) : (
-                    <div className="h-full min-h-[170px] sm:min-h-[190px] flex items-center justify-center text-slate-500 text-sm">Click to upload</div>
-                  )}
-                </div>
-                <div className="grid grid-cols-4 gap-2 mt-3">
-                  {Array.from({ length: 8 }).map((_, idx) => {
-                    const sample = block.samples[idx];
-                    return (
-                      <button key={`${block.key}-${idx}`} type="button" className="aspect-square rounded-lg border border-slate-200 overflow-hidden bg-white" onClick={() => sample && useSample(block.key, sample)}>
-                        {sample ? <img src={sample.url} alt={sample.fileName} className="w-full h-full object-contain bg-slate-50" /> : <div className="w-full h-full bg-slate-100" />}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            ))}
-
-            <button
-              onClick={runTryOn}
-              disabled={!canRun}
-              className={`inline-flex items-center justify-center gap-2 px-8 py-3.5 rounded-xl font-semibold ${
-                canRun ? "bg-slate-900 text-white hover:bg-slate-800" : "bg-slate-100 text-slate-400 border border-slate-200"
-              }`}
-            >
-              Generate Try-On <ArrowRight className="w-5 h-5" />
-            </button>
+        {error && (
+          <div className="mb-4 rounded-xl border border-red-200 bg-red-50 text-red-700 p-3 text-sm">
+            {AUTH_TRY_ON_ERROR_RE.test(error) ? (
+              <span>
+                Please{" "}
+                <Link
+                  to="/signup"
+                  className="font-semibold text-brand-700 underline underline-offset-2 hover:text-brand-800"
+                >
+                  create an account
+                </Link>{" "}
+                or{" "}
+                <Link
+                  to="/login"
+                  className="font-semibold text-brand-700 underline underline-offset-2 hover:text-brand-800"
+                >
+                  log in
+                </Link>{" "}
+                to use try-on generation.
+              </span>
+            ) : (
+              error
+            )}
           </div>
+        )}
 
-          <div className="lg:col-span-7 flex flex-col gap-4">
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+          {[
+            { key: "person", title: "Person Input (Image/Video)", preview: personPreview, ref: personInputRef, samples: personSamples },
+            { key: "garment", title: "Garment Image", preview: garmentPreview, ref: garmentInputRef, samples: clothSamples }
+          ].map((block) => (
+            <div key={block.key} className="rounded-2xl border border-slate-200 bg-white p-4">
+              <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-500 mb-3">{block.title}</h3>
+              <div
+                className="relative rounded-2xl border border-slate-200 bg-slate-50 min-h-[170px] sm:min-h-[190px] overflow-hidden"
+                onClick={() => !block.preview && block.ref.current?.click()}
+              >
+                <input
+                  ref={block.ref}
+                  type="file"
+                  className="hidden"
+                  accept={block.key === "person" ? "image/jpeg,image/png,image/webp,video/mp4,video/webm,video/quicktime" : "image/jpeg,image/png,image/webp"}
+                  onChange={(e) => setPreview(block.key, e.target.files?.[0] || null)}
+                />
+                {block.preview ? (
+                  <>
+                    {block.key === "person" && personMediaType === "video" ? (
+                      <video src={block.preview} className="w-full h-full object-contain bg-slate-50" controls muted playsInline />
+                    ) : (
+                      <img src={block.preview} alt={block.title} className="w-full h-full object-contain bg-slate-50" />
+                    )}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        clearType(block.key);
+                      }}
+                      className="absolute top-3 right-3 p-2 rounded-lg bg-white border border-slate-200 text-slate-700"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </>
+                ) : (
+                  <div className="h-full min-h-[170px] sm:min-h-[190px] flex items-center justify-center text-slate-500 text-sm">Click to upload</div>
+                )}
+              </div>
+              <div className="grid grid-cols-4 gap-2 mt-3">
+                {Array.from({ length: 8 }).map((_, idx) => {
+                  const sample = block.samples[idx];
+                  return (
+                    <button
+                      key={`${block.key}-${idx}`}
+                      type="button"
+                      className="aspect-square rounded-lg border border-slate-200 overflow-hidden bg-white"
+                      onClick={() => sample && useSample(block.key, sample)}
+                    >
+                      {sample ? (
+                        <img src={sample.url} alt={sample.fileName} className="w-full h-full object-contain bg-slate-50" />
+                      ) : (
+                        <div className="w-full h-full bg-slate-100" />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-6 flex justify-center">
+          <button
+            type="button"
+            onClick={runTryOn}
+            disabled={!canRun}
+            className={`inline-flex items-center justify-center gap-2 px-8 py-3.5 rounded-xl font-semibold ${
+              canRun ? "bg-slate-900 text-white hover:bg-slate-800" : "bg-slate-100 text-slate-400 border border-slate-200"
+            }`}
+          >
+            Generate Try-On <ArrowRight className="w-5 h-5" />
+          </button>
+        </div>
+
+        {showOutputSection && (
+          <div className="mx-auto mt-10 w-full max-w-5xl">
             <div
               className={`rounded-3xl border border-slate-200 bg-white p-3 flex flex-col ${
-                status === "success" && resultImage ? "h-auto" : "h-full"
+                status === "success" && resultImage ? "h-auto" : "min-h-[360px] sm:min-h-[420px]"
               }`}
             >
               <div className="flex flex-wrap items-center justify-between gap-2 px-1 pb-2">
@@ -797,11 +1012,11 @@ export default function TryOnStudio({ user }) {
               )}
               <div
                 className={`rounded-2xl bg-slate-100 overflow-hidden ${
-                  isProcessing ? "h-full min-h-[320px] lg:min-h-0" : status === "success" && resultImage ? "" : "min-h-[320px]"
+                  isProcessing ? "min-h-[320px]" : status === "success" && resultImage ? "" : "min-h-[260px]"
                 }`}
               >
                 {isProcessing ? (
-                  <div className="w-full h-full flex items-center justify-center p-6 bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-900">
+                  <div className="w-full h-full min-h-[320px] flex items-center justify-center p-6 bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-900">
                     <div className="w-full max-w-md rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl p-8 text-center shadow-2xl relative overflow-hidden">
                       <div className="absolute inset-0 opacity-40 bg-[radial-gradient(circle_at_50%_10%,rgba(56,189,248,0.25),transparent_38%)]" />
                       <div className="relative mx-auto mb-5 w-16 h-16">
@@ -890,9 +1105,13 @@ export default function TryOnStudio({ user }) {
                       <img src={resultImage} alt="Generated try-on" className="w-full h-full object-cover" />
                     </div>
                   )
+                ) : status === "error" ? (
+                  <div className="w-full min-h-[200px] flex items-center justify-center text-slate-500 text-sm p-6 text-center">
+                    Try-on did not finish. See the message above the studio controls and try again.
+                  </div>
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-slate-500 text-sm p-6 text-center">
-                    Upload person + garment images on the left, then click Generate to view the output here.
+                    Upload person and garment above, then click Generate to see your result here.
                   </div>
                 )}
               </div>
@@ -922,7 +1141,9 @@ export default function TryOnStudio({ user }) {
                   >
                     <ThumbsDown className="w-4 h-4" /> Dislike
                   </button>
-                  <div className={`ml-1 inline-flex items-center rounded-lg border border-slate-200 bg-white px-2 py-1.5 ${animatedRating === "stars" ? "scale-105" : "scale-100"} transition-all duration-200`}>
+                  <div
+                    className={`ml-1 inline-flex items-center rounded-lg border border-slate-200 bg-white px-2 py-1.5 ${animatedRating === "stars" ? "scale-105" : "scale-100"} transition-all duration-200`}
+                  >
                     {Array.from({ length: 5 }).map((_, idx) => {
                       const star = idx + 1;
                       const active = selectedStars >= star;
@@ -964,20 +1185,104 @@ export default function TryOnStudio({ user }) {
                 </div>
               )}
             </div>
-            {status === "success" && resultImage && personMediaType === "image" && <StyleInsightsPanel personImageUrl={personPreview} clothImageUrl={garmentPreview} />}
+            {status === "success" && resultImage && personMediaType === "image" && (
+              <div className="mt-4">
+                <StyleInsightsPanel personImageUrl={personPreview} clothImageUrl={garmentPreview} />
+              </div>
+            )}
           </div>
-        </div>
+        )}
       </div>
-      {isImageFullscreenOpen && resultImage && (
-        <div className="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center p-4">
-          <button
-            type="button"
-            onClick={() => setIsImageFullscreenOpen(false)}
-            className="absolute top-4 right-4 inline-flex items-center gap-1 rounded-lg border border-white/30 bg-black/40 px-3 py-1.5 text-white text-sm hover:bg-black/60"
+      {isImageFullscreenOpen && resultImage && resultMediaType === "image" && (
+        <div
+          className="fixed inset-0 z-[100] flex flex-col bg-black/95"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Fullscreen try-on result"
+        >
+          <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-white/10 px-3 py-2.5 text-white sm:px-4">
+            <p className="min-w-0 flex-1 text-sm font-medium truncate">Try-on result</p>
+            <div className="flex shrink-0 items-center gap-1 rounded-lg bg-white/10 px-1 py-0.5">
+              <button
+                type="button"
+                onClick={() =>
+                  setFullscreenZoom((z) => Math.max(FS_ZOOM_MIN, Math.round((z - FS_ZOOM_STEP) * 100) / 100))
+                }
+                disabled={fullscreenZoom <= FS_ZOOM_MIN}
+                className="rounded-md p-2 text-white/90 hover:bg-white/15 disabled:pointer-events-none disabled:opacity-35 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+                aria-label="Zoom out"
+              >
+                <ZoomOut className="w-4 h-4" />
+              </button>
+              <span className="min-w-[3rem] select-none text-center text-xs tabular-nums text-white/85">
+                {Math.round(fullscreenZoom * 100)}%
+              </span>
+              <button
+                type="button"
+                onClick={() =>
+                  setFullscreenZoom((z) => Math.min(FS_ZOOM_MAX, Math.round((z + FS_ZOOM_STEP) * 100) / 100))
+                }
+                disabled={fullscreenZoom >= FS_ZOOM_MAX}
+                className="rounded-md p-2 text-white/90 hover:bg-white/15 disabled:pointer-events-none disabled:opacity-35 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+                aria-label="Zoom in"
+              >
+                <ZoomIn className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setFullscreenZoom(1)}
+                disabled={fullscreenZoom === 1}
+                className="ml-0.5 rounded-md p-2 text-white/90 hover:bg-white/15 disabled:pointer-events-none disabled:opacity-35 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+                aria-label="Reset zoom"
+                title="Reset zoom"
+              >
+                <RotateCcw className="w-4 h-4" />
+              </button>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsImageFullscreenOpen(false)}
+              className="shrink-0 rounded-lg p-2 text-white/90 hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+              aria-label="Close fullscreen"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+          <div
+            ref={fullscreenScrollRef}
+            className="mx-auto min-h-0 w-full flex-1 cursor-default overflow-auto touch-pan-x touch-pan-y"
+            onTouchStart={handleFsTouchStart}
+            onTouchMove={handleFsTouchMove}
+            onTouchEnd={handleFsTouchEnd}
           >
-            <X className="w-4 h-4" /> Close
-          </button>
-          <img src={resultImage} alt="Generated try-on full view" className="max-w-full max-h-full object-contain" />
+            <div className="flex min-h-full min-w-full items-center justify-center p-4">
+              <img
+                src={resultImage}
+                alt="Generated try-on full view"
+                onLoad={(e) => {
+                  const t = e.currentTarget;
+                  setFullscreenNatural({ w: t.naturalWidth, h: t.naturalHeight });
+                }}
+                onDoubleClick={(e) => {
+                  e.preventDefault();
+                  setFullscreenZoom((z) => (z > 1.05 ? 1 : Math.min(2, FS_ZOOM_MAX)));
+                }}
+                style={
+                  fullscreenImageLayout.ready
+                    ? {
+                        width: fullscreenImageLayout.displayW,
+                        height: fullscreenImageLayout.displayH,
+                        transition: "width 0.12s ease-out, height 0.12s ease-out"
+                      }
+                    : undefined
+                }
+                className={`block select-none rounded-lg ${
+                  fullscreenImageLayout.ready ? "" : "max-h-[calc(100vh-6rem)] max-w-[min(100vw-2rem,100%)] object-contain"
+                }`}
+                draggable={false}
+              />
+            </div>
+          </div>
         </div>
       )}
     </div>

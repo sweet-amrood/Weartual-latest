@@ -384,7 +384,10 @@ export default function OutfitHistory({ user }) {
           <div>
             <h1 className="text-2xl font-bold text-slate-900">Outfit History</h1>
             <p className="text-sm text-slate-500">
-              Saved looks for user ID: {userId}
+              Saved looks for{" "}
+              <span className="font-medium text-slate-700">
+                {user?.username?.trim() || user?.email || "your account"}
+              </span>
               {lookCount !== null ? (
                 <span className="text-slate-600"> · Your looks: {lookCount}</span>
               ) : null}

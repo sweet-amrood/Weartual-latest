@@ -28,7 +28,19 @@ export const uploadMyImage = async ({ imageFile, garmentFile }) => {
   const form = new FormData();
   form.append("image", imageFile);
   form.append("garment", garmentFile);
-  return requestJson("/api/images/me", { method: "POST", body: form });
+  const response = await fetch(`${API_URL}/api/images/me`, {
+    method: "POST",
+    credentials: "include",
+    body: form
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error("Please create an account or log in to use try-on generation.");
+    }
+    throw new Error(data.message || "Request failed");
+  }
+  return data;
 };
 
 export const listDatasetSamples = (type, offset = 0) =>
