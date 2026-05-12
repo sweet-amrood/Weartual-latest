@@ -17,6 +17,7 @@ import {
   Shield
 } from "lucide-react";
 import { getMe, patchMe, uploadMyAvatar, linkGoogleAccount } from "../services/authApi";
+import FashionShareCardsSection from "../components/FashionShareCardsSection";
 
 /** Built-in illustrated avatars (DiceBear); stored as `avatarUrl` via PATCH. */
 const DEFAULT_AVATAR_OPTIONS = [
@@ -356,6 +357,8 @@ export default function Profile({ user, onUserUpdated }) {
             {profileError && <p className="text-sm text-red-600 dark:text-red-400">{profileError}</p>}
           </form>
         </section>
+
+        {displayUser ? <FashionShareCardsSection username={displayUser.username} /> : null}
 
         {displayUser && !displayUser.googleLinked && (
           <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm mb-6 dark:border-slate-700 dark:bg-slate-900">
