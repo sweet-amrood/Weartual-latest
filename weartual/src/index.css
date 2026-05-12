@@ -15,6 +15,23 @@
 }
 
 @layer base {
+  :root {
+    --weartual-scrollbar-size: 8px;
+    --weartual-scrollbar-radius: 100px;
+    /* Firefox only accepts solid colors for scrollbar-color */
+    --weartual-scrollbar-thumb-fg: #7c3aed;
+    --weartual-scrollbar-thumb-bg: #c4b5fd;
+    --weartual-scrollbar-thumb-hover: #6d28d9;
+    --weartual-scrollbar-track: transparent;
+  }
+
+  html.dark,
+  .dark {
+    --weartual-scrollbar-thumb-fg: #a78bfa;
+    --weartual-scrollbar-thumb-bg: #5b21b6;
+    --weartual-scrollbar-thumb-hover: #c4b5fd;
+  }
+
   body {
     @apply font-sans text-slate-900 bg-slate-50 antialiased selection:bg-brand-500 selection:text-white dark:bg-slate-950 dark:text-slate-100;
   }
@@ -23,52 +40,95 @@
     @apply font-serif tracking-tight;
   }
 
-  /* Themed scrollbars — brand violet / slate (Firefox) */
+  /* Custom scrollbars — Weartual violet pill (Firefox) */
   * {
     scrollbar-width: thin;
-    scrollbar-color: rgb(124 58 237) rgb(241 245 249);
+    scrollbar-color: var(--weartual-scrollbar-thumb-fg) var(--weartual-scrollbar-track);
   }
 
-  html.dark *,
-  .dark * {
-    scrollbar-color: rgb(139 92 246 / 0.85) rgb(15 23 42);
-  }
-
-  /* WebKit (Chrome, Edge, Safari) */
+  /* WebKit: Chrome, Edge, Safari */
   *::-webkit-scrollbar {
-    width: 9px;
-    height: 9px;
+    width: var(--weartual-scrollbar-size);
+    height: var(--weartual-scrollbar-size);
   }
 
   *::-webkit-scrollbar-track {
-    background: rgb(241 245 249);
-    border-radius: 9999px;
+    margin-block: 4px;
+    background: var(--weartual-scrollbar-track);
+    border-radius: var(--weartual-scrollbar-radius);
   }
 
   *::-webkit-scrollbar-thumb {
-    background: linear-gradient(180deg, rgb(167 139 250), rgb(124 58 237));
-    border-radius: 9999px;
-    border: 2px solid rgb(241 245 249);
+    border-radius: var(--weartual-scrollbar-radius);
+    border: 2px solid transparent;
+    background-clip: padding-box;
+    background-image: linear-gradient(
+      165deg,
+      var(--weartual-scrollbar-thumb-bg) 0%,
+      var(--weartual-scrollbar-thumb-fg) 55%,
+      #4c1d95 100%
+    );
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.22),
+      0 1px 2px rgba(76, 29, 149, 0.35);
   }
 
   *::-webkit-scrollbar-thumb:hover {
-    background: linear-gradient(180deg, rgb(196 181 253), rgb(139 92 246));
+    background-image: linear-gradient(
+      165deg,
+      #ddd6fe 0%,
+      var(--weartual-scrollbar-thumb-hover) 50%,
+      #5b21b6 100%
+    );
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.28),
+      0 2px 6px rgba(76, 29, 149, 0.45);
   }
 
-  html.dark *::-webkit-scrollbar-track,
-  .dark *::-webkit-scrollbar-track {
-    background: rgb(15 23 42);
+  *::-webkit-scrollbar-thumb:active {
+    background-image: linear-gradient(165deg, #7c3aed, #4c1d95);
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
+  }
+
+  *::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
+  *::-webkit-scrollbar-button {
+    width: 0;
+    height: 0;
+    display: none;
   }
 
   html.dark *::-webkit-scrollbar-thumb,
   .dark *::-webkit-scrollbar-thumb {
-    background: linear-gradient(180deg, rgb(139 92 246 / 0.9), rgb(91 33 182 / 0.95));
-    border-color: rgb(15 23 42);
+    background-image: linear-gradient(
+      165deg,
+      rgba(196, 181, 253, 0.55) 0%,
+      var(--weartual-scrollbar-thumb-fg) 45%,
+      var(--weartual-scrollbar-thumb-bg) 100%
+    );
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.12),
+      0 1px 3px rgba(0, 0, 0, 0.45);
   }
 
   html.dark *::-webkit-scrollbar-thumb:hover,
   .dark *::-webkit-scrollbar-thumb:hover {
-    background: linear-gradient(180deg, rgb(167 139 250 / 0.95), rgb(124 58 237));
+    background-image: linear-gradient(
+      165deg,
+      rgba(221, 214, 254, 0.75) 0%,
+      var(--weartual-scrollbar-thumb-hover) 50%,
+      #7c3aed 100%
+    );
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.18),
+      0 2px 8px rgba(0, 0, 0, 0.5);
+  }
+
+  html.dark *::-webkit-scrollbar-thumb:active,
+  .dark *::-webkit-scrollbar-thumb:active {
+    background-image: linear-gradient(165deg, #8b5cf6, #4c1d95);
   }
 }
 

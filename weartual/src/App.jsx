@@ -13,6 +13,7 @@ import Contact from "./pages/Contact";
 import OutfitHistory from "./pages/OutfitHistory";
 import Profile from "./pages/Profile";
 import { getMe } from "./services/authApi";
+import { getAuthenticatedUserId, tryMigrateAnonymousOutfitHistory } from "./services/outfitHistory";
 import { useWeartualAppTour } from "./hooks/useWeartualAppTour";
 
 function AppRoutes() {
@@ -22,10 +23,12 @@ function AppRoutes() {
   const { pathname } = useLocation();
 
   const handleLogin = (userData) => {
+    tryMigrateAnonymousOutfitHistory(getAuthenticatedUserId(userData));
     setUser(userData);
   };
 
   const handleSignup = (userData) => {
+    tryMigrateAnonymousOutfitHistory(getAuthenticatedUserId(userData));
     setUser(userData);
   };
 
@@ -40,7 +43,10 @@ function AppRoutes() {
       setAuthLoading(true);
       try {
         const res = await getMe();
-        if (!cancelled) setUser(res.user);
+        if (!cancelled) {
+          tryMigrateAnonymousOutfitHistory(getAuthenticatedUserId(res.user));
+          setUser(res.user);
+        }
       } catch {
         if (!cancelled) setUser(null);
       } finally {

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
 import {
   Clock3,
@@ -20,10 +20,11 @@ import {
   getOutfitRatings,
   removeOutfitHistoryEntryAt,
   removeOutfitRatingByOutfitId,
-  setOutfitHistory
+  setOutfitHistory,
+  tryMigrateAnonymousOutfitHistory
 } from "../services/outfitHistory";
 import { deleteMyImage, deleteMyImageByResultUrl, getMyLookCount, listMyImages } from "../services/imageApi";
-import { easeOut, fadeUpItem, staggerChildren } from "../lib/motionPresets";
+import { easeOut } from "../lib/motionPresets";
 
 const HISTORY_JOB_ID_RE = /^[a-f0-9]{24}$/i;
 
@@ -74,24 +75,31 @@ const sameHistoryEntry = (a, b) => {
 
 const stripUrlQuery = (u) => String(u || "").trim().split("?")[0];
 
+const pickJobResultUrl = (job) =>
+  String(job?.resultUrl ?? job?.result_url ?? job?.result ?? "").trim();
+
 /** Build a history row from an API job (`listMyImages`). */
 const serverJobToHistoryEntry = (job) => {
+  const image = pickJobResultUrl(job);
+  if (!image) return null;
+
   const id = job?.id != null ? String(job.id).trim() : null;
-  const rawTs = job?.processedAt || job?.createdAt || job?.updatedAt;
+  const rawTs = job?.processedAt || job?.processed_at || job?.createdAt || job?.created_at || job?.updatedAt || job?.updated_at;
   const timestamp =
     typeof rawTs === "string"
       ? rawTs
       : rawTs && typeof rawTs.toISOString === "function"
         ? rawTs.toISOString()
         : new Date().toISOString();
-  const garment = String(job?.garmentFilename || "").trim();
+  const garment = String(job?.garmentFilename ?? job?.garment_filename ?? "").trim();
+  const rType = job?.resultType ?? job?.result_type;
   return {
-    image: String(job?.resultUrl || "").trim(),
+    image,
     timestamp,
     outfitId: id || timestamp,
     jobId: id || undefined,
     name: garment ? `Try-on: ${garment}` : "Generated outfit look",
-    resultType: job?.resultType === "video" ? "video" : "image"
+    resultType: rType === "video" ? "video" : "image"
   };
 };
 
@@ -122,8 +130,9 @@ const mergeServerAndLocalHistory = (serverJobs, localEntries) => {
 
   const serverList = Array.isArray(serverJobs) ? serverJobs : [];
   for (const job of serverList) {
-    if (!String(job?.resultUrl || "").trim()) continue;
-    consume(serverJobToHistoryEntry(job));
+    const row = serverJobToHistoryEntry(job);
+    if (!row) continue;
+    consume(row);
   }
 
   for (const e of Array.isArray(localEntries) ? localEntries : []) {
@@ -170,6 +179,10 @@ export default function OutfitHistory({ user }) {
 
   /** Load local rows, then hydrate from server so count and list stay in sync across devices. */
   useEffect(() => {
+    if (user && userId && userId !== "anonymous") {
+      tryMigrateAnonymousOutfitHistory(userId);
+    }
+
     const local = getOutfitHistory(userId);
     setItems(local);
     setRatingsByOutfitId(ratingsToMap(getOutfitRatings(userId)));
@@ -182,8 +195,14 @@ export default function OutfitHistory({ user }) {
     listMyImages()
       .then((data) => {
         if (cancelled) return;
-        const serverJobs = Array.isArray(data?.images) ? data.images : [];
-        const merged = mergeServerAndLocalHistory(serverJobs, local);
+        const serverJobs = Array.isArray(data?.images)
+          ? data.images
+          : Array.isArray(data?.jobs)
+            ? data.jobs
+            : Array.isArray(data?.data)
+              ? data.data
+              : [];
+        const merged = mergeServerAndLocalHistory(serverJobs, getOutfitHistory(userId));
         setItems(merged);
         setOutfitHistory(userId, merged);
       })
@@ -196,7 +215,7 @@ export default function OutfitHistory({ user }) {
     return () => {
       cancelled = true;
     };
-  }, [userId]);
+  }, [userId, user]);
 
   useEffect(() => {
     if (!user) {
@@ -508,19 +527,19 @@ export default function OutfitHistory({ user }) {
             <p className="text-slate-500 dark:text-slate-400">Generate a try-on result in Studio to start building your history.</p>
           </motion.div>
         ) : (
-          <motion.div
-            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5"
-            variants={staggerChildren(reduceMotion, 0.05)}
-            initial="hidden"
-            animate="show"
-          >
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {items.map((entry, idx) => (
               <motion.article
                 key={entry.outfitId || `${entry.timestamp}-${idx}`}
-                variants={fadeUpItem(reduceMotion)}
-                layout
+                initial={reduceMotion ? false : { opacity: 0, y: 14 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{
+                  duration: reduceMotion ? 0 : 0.38,
+                  ease: easeOut,
+                  delay: reduceMotion ? 0 : Math.min(idx, 12) * 0.045
+                }}
+                layout={!reduceMotion}
                 whileHover={reduceMotion ? {} : { y: -3 }}
-                transition={{ layout: reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 380, damping: 28 } }}
                 className="rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-sm dark:border-slate-700 dark:bg-slate-900"
               >
                 <div className="relative aspect-[4/5] bg-slate-100 group">
@@ -590,7 +609,7 @@ export default function OutfitHistory({ user }) {
                 </div>
               </motion.article>
             ))}
-          </motion.div>
+          </div>
         )}
       </div>
     </div>

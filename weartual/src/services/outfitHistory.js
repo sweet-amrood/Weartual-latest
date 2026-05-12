@@ -16,6 +16,53 @@ export const getAuthenticatedUserId = (user) => {
 
 export const getOutfitHistoryKey = (userId) => `history_${userId}`;
 
+/**
+ * If the user generated try-ons before auth/session restored, entries may live under
+ * `history_anonymous`. Merge those into the signed-in account once (dedupe by image URL).
+ */
+export const tryMigrateAnonymousOutfitHistory = (authenticatedUserId) => {
+  if (typeof window === "undefined") return false;
+  const uid = String(authenticatedUserId || "").trim();
+  if (!uid || uid === FALLBACK_USER_ID) return false;
+
+  let anon = [];
+  try {
+    const raw = window.localStorage.getItem(getOutfitHistoryKey(FALLBACK_USER_ID));
+    if (!raw) return false;
+    const parsed = JSON.parse(raw);
+    anon = Array.isArray(parsed) ? parsed : [];
+    if (anon.length === 0) return false;
+  } catch {
+    return false;
+  }
+
+  const current = getOutfitHistory(uid);
+  const seen = new Set();
+  const merged = [];
+  for (const entry of [...anon, ...current]) {
+    const img = String(entry?.image || "")
+      .trim()
+      .split("?")[0];
+    if (!img) continue;
+    if (seen.has(img)) continue;
+    seen.add(img);
+    merged.push(entry);
+  }
+  merged.sort((a, b) => {
+    const ta = new Date(a.timestamp || 0).getTime();
+    const tb = new Date(b.timestamp || 0).getTime();
+    return tb - ta;
+  });
+
+  try {
+    window.localStorage.setItem(getOutfitHistoryKey(uid), JSON.stringify(merged));
+    window.localStorage.removeItem(getOutfitHistoryKey(FALLBACK_USER_ID));
+  } catch {
+    return false;
+  }
+  return true;
+};
+
 export const getOutfitHistory = (userId) => {
   if (typeof window === "undefined") return [];
   try {
