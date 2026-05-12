@@ -106,7 +106,7 @@ export default function Navbar({ user, onLogout }) {
                     </>
                   )}
                 </NavLink>
-                <NavLink to="/studio" className={navLinkClass}>
+                <NavLink to="/studio" data-tour="nav-studio" className={navLinkClass}>
                   {({ isActive }) => (
                     <>
                       <span className="flex items-center gap-1.5"><Sparkles className="w-4 h-4" /> Try-On Studio</span>
@@ -138,6 +138,7 @@ export default function Navbar({ user, onLogout }) {
                 <div className="hidden md:flex items-center gap-3 border-l border-slate-200 dark:border-slate-600 pl-5 ml-1">
                   <NavLink
                     to="/profile"
+                    data-tour="nav-profile"
                     title="Profile"
                     aria-label="Open profile"
                     className={({ isActive }) =>
@@ -205,6 +206,7 @@ export default function Navbar({ user, onLogout }) {
               </NavLink>
               <NavLink
                 to="/studio"
+                data-tour="nav-studio"
                 className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800"
               >
                 <Sparkles className="w-4 h-4" /> Try-On Studio
@@ -224,6 +226,7 @@ export default function Navbar({ user, onLogout }) {
               {user ? (
                 <NavLink
                   to="/profile"
+                  data-tour="nav-profile"
                   className={({ isActive }) =>
                     `flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-colors ${
                       isActive

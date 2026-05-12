@@ -659,7 +659,7 @@ export default function TryOnStudio({ user }) {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
-      <div className="max-w-6xl mx-auto px-4 py-12">
+      <div id="tour-studio-root" className="max-w-6xl mx-auto px-4 py-12">
         <div
           className="text-center mb-6 animate-fade-in-up relative isolate overflow-hidden rounded-3xl border border-white/10 bg-[#050814] min-h-[300px] sm:min-h-[340px] flex items-center justify-center px-5 sm:px-6"
           onMouseMove={handleHeroMouseMove}

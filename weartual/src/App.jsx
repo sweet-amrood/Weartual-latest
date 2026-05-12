@@ -1,21 +1,24 @@
-import React, { useEffect, useState } from 'react'
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
-import Login from './pages/login'
-import Signup from './pages/signup'
-import ForgetPassword from './pages/forgetpassword'
-import ResetPassword from './pages/ResetPassword'
-import Navbar from './components/Navbar'
-import LandingPage from './pages/LandingPage'
-import TryOnStudio from './pages/TryOnStudio'
-import AboutUs from './pages/AboutUs'
-import Contact from './pages/Contact'
-import OutfitHistory from './pages/OutfitHistory'
-import Profile from './pages/Profile'
-import { getMe } from './services/authApi'
+import React, { useEffect, useState } from "react";
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
+import Login from "./pages/login";
+import Signup from "./pages/signup";
+import ForgetPassword from "./pages/forgetpassword";
+import ResetPassword from "./pages/ResetPassword";
+import Navbar from "./components/Navbar";
+import LandingPage from "./pages/LandingPage";
+import TryOnStudio from "./pages/TryOnStudio";
+import AboutUs from "./pages/AboutUs";
+import Contact from "./pages/Contact";
+import OutfitHistory from "./pages/OutfitHistory";
+import Profile from "./pages/Profile";
+import { getMe } from "./services/authApi";
+import { useWeartualAppTour } from "./hooks/useWeartualAppTour";
 
-export default function App() {
+function AppRoutes() {
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const navigate = useNavigate();
+  const { pathname } = useLocation();
 
   const handleLogin = (userData) => {
     setUser(userData);
@@ -38,7 +41,6 @@ export default function App() {
         const res = await getMe();
         if (!cancelled) setUser(res.user);
       } catch {
-        // Not logged in (or backend down) - ignore.
         if (!cancelled) setUser(null);
       } finally {
         if (!cancelled) setAuthLoading(false);
@@ -51,8 +53,10 @@ export default function App() {
     };
   }, []);
 
+  useWeartualAppTour({ pathname, navigate, user, authLoading });
+
   return (
-    <Router>
+    <>
       <Navbar user={user} onLogout={handleLogout} />
       <Routes>
         <Route path="/" element={<LandingPage />} />
@@ -62,7 +66,10 @@ export default function App() {
           path="/profile"
           element={
             authLoading ? (
-              <div className="min-h-[60vh] flex items-center justify-center text-slate-600 dark:text-slate-400">
+              <div
+                id="tour-profile-root"
+                className="min-h-[60vh] flex items-center justify-center text-slate-600 dark:text-slate-400"
+              >
                 Loading...
               </div>
             ) : user ? (
@@ -106,6 +113,14 @@ export default function App() {
         <Route path="/reset-password/:token" element={<ResetPassword />} />
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
+    </>
+  );
+}
+
+export default function App() {
+  return (
+    <Router>
+      <AppRoutes />
     </Router>
   );
 }

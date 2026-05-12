@@ -335,7 +335,7 @@ export default function OutfitHistory({ user }) {
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-slate-50 px-4 py-10 dark:bg-slate-950 dark:text-slate-100">
+      <div id="tour-history-root" className="min-h-screen bg-slate-50 px-4 py-10 dark:bg-slate-950 dark:text-slate-100">
         <div className="max-w-5xl mx-auto rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-sm dark:border-slate-700 dark:bg-slate-900">
           <History className="w-10 h-10 mx-auto text-slate-400 mb-3" />
           <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100 mb-2">Outfit History</h1>
@@ -346,7 +346,7 @@ export default function OutfitHistory({ user }) {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 px-4 py-10 dark:bg-slate-950 dark:text-slate-100">
+    <div id="tour-history-root" className="min-h-screen bg-slate-50 px-4 py-10 dark:bg-slate-950 dark:text-slate-100">
       {fullscreenEntry ? (
         <div
           className="fixed inset-0 z-[100] flex flex-col bg-black/92 backdrop-blur-sm"

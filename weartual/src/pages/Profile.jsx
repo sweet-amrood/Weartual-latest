@@ -213,7 +213,7 @@ export default function Profile({ user, onUserUpdated }) {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 px-4 py-10 dark:bg-slate-950 dark:text-slate-100">
+    <div id="tour-profile-root" className="min-h-screen bg-slate-50 px-4 py-10 dark:bg-slate-950 dark:text-slate-100">
       <div className="max-w-3xl mx-auto">
         <div className="flex items-center gap-3 mb-8">
           <div className="w-12 h-12 rounded-2xl bg-brand-100 text-brand-700 flex items-center justify-center">

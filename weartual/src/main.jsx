@@ -1,6 +1,7 @@
 import { createRoot } from 'react-dom/client'
 import { GoogleOAuthProvider } from '@react-oauth/google'
-import './index.css'
+import "./index.css";
+import "driver.js/dist/driver.css";
 import App from './App.jsx'
 import { ThemeProvider } from './context/ThemeContext.jsx'
 

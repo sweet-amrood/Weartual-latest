@@ -87,7 +87,7 @@ export default function LandingPage() {
         <div className="absolute -bottom-20 -right-16 h-72 w-72 rounded-full bg-indigo-200/50 blur-3xl" />
 
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center max-w-3xl mx-auto animate-fade-in-up">
+          <div id="tour-landing-hero" className="text-center max-w-3xl mx-auto animate-fade-in-up">
             <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand-100 text-brand-700 text-sm font-semibold mb-6">
               <Sparkles className="w-4 h-4" /> AI-Powered Virtual Try-On
             </span>
