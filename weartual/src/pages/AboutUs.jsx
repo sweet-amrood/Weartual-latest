@@ -1,6 +1,11 @@
 import { useState } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { easeOut, staggerChildren, fadeUpItem } from "../lib/motionPresets";
+
+const viewPort = { once: true, margin: "-48px" };
 
 export default function AboutUs() {
+  const reduceMotion = useReducedMotion();
   const [activeStage, setActiveStage] = useState(0);
   const [activeChallenge, setActiveChallenge] = useState("drape");
   const [openFaq, setOpenFaq] = useState(0);
@@ -78,47 +83,110 @@ export default function AboutUs() {
     }
   ];
 
+  const stageVariants = fadeUpItem(reduceMotion);
+  const tapHover = reduceMotion ? {} : { whileHover: { y: -2 }, whileTap: { scale: 0.99 } };
+
   return (
     <div className="max-w-6xl mx-auto px-4 py-14 sm:px-6 lg:px-8 text-slate-900 dark:text-slate-100">
       <div className="text-center mb-12">
-        <div className="inline-flex items-center px-4 py-1.5 rounded-full border border-indigo-200 bg-indigo-50 text-indigo-700 text-xs font-semibold tracking-widest uppercase mb-5 dark:border-indigo-500/35 dark:bg-indigo-950/60 dark:text-indigo-200">
+        <motion.div
+          className="inline-flex items-center px-4 py-1.5 rounded-full border border-indigo-200 bg-indigo-50 text-indigo-700 text-xs font-semibold tracking-widest uppercase mb-5 dark:border-indigo-500/35 dark:bg-indigo-950/60 dark:text-indigo-200"
+          initial={reduceMotion ? false : { opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={
+            reduceMotion ? { duration: 0 } : { duration: 0.38, ease: easeOut, delay: 0 }
+          }
+        >
           Weartual Research Track
-        </div>
-        <h1 className="text-4xl md:text-5xl font-bold text-slate-900 dark:text-slate-100 mb-4">About Our Eastern-Wear Virtual Try-On System</h1>
-        <p className="text-lg text-slate-600 max-w-3xl mx-auto leading-relaxed dark:text-slate-400">
+        </motion.div>
+        <motion.h1
+          className="text-4xl md:text-5xl font-bold text-slate-900 dark:text-slate-100 mb-4"
+          initial={reduceMotion ? false : { opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={
+            reduceMotion ? { duration: 0 } : { duration: 0.45, ease: easeOut, delay: 0.06 }
+          }
+        >
+          About Our Eastern-Wear Virtual Try-On System
+        </motion.h1>
+        <motion.p
+          className="text-lg text-slate-600 max-w-3xl mx-auto leading-relaxed dark:text-slate-400"
+          initial={reduceMotion ? false : { opacity: 0, y: 14 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={
+            reduceMotion ? { duration: 0 } : { duration: 0.45, ease: easeOut, delay: 0.12 }
+          }
+        >
           We are building a virtual try-on platform focused on eastern wear, where graceful drape, intricate detailing,
           and culturally specific silhouettes matter as much as fit. Our work combines robust input handling, dataset-aware
           asset mapping, and StableVITON-ready bundling to deliver realistic previews users can trust.
-        </p>
+        </motion.p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-12">
-        <div className="rounded-2xl border border-slate-700 bg-slate-900 p-6 shadow-sm">
-          <p className="text-3xl font-bold text-slate-100">01</p>
-          <p className="mt-2 text-sm font-semibold uppercase tracking-wide text-slate-400">Core domain</p>
-          <p className="mt-3 text-slate-300 leading-relaxed">Eastern wear: kurtas, festive tops, embroidered garments, and layered silhouettes.</p>
-        </div>
-        <div className="rounded-2xl border border-slate-700 bg-slate-900 p-6 shadow-sm">
-          <p className="text-3xl font-bold text-slate-100">02</p>
-          <p className="mt-2 text-sm font-semibold uppercase tracking-wide text-slate-400">Technical focus</p>
-          <p className="mt-3 text-slate-300 leading-relaxed">StableVITON-compatible multimodal bundle generation with deterministic file mapping.</p>
-        </div>
-        <div className="rounded-2xl border border-slate-700 bg-slate-900 p-6 shadow-sm">
-          <p className="text-3xl font-bold text-slate-100">03</p>
-          <p className="mt-2 text-sm font-semibold uppercase tracking-wide text-slate-400">Product goal</p>
-          <p className="mt-3 text-slate-300 leading-relaxed">Reduce uncertainty in online purchase decisions with reliable visual fit previews.</p>
-        </div>
-      </div>
+      <motion.div
+        className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-12"
+        initial="hidden"
+        whileInView="show"
+        viewport={viewPort}
+        variants={staggerChildren(reduceMotion, 0.09)}
+      >
+        {[
+          {
+            n: "01",
+            label: "Core domain",
+            body: "Eastern wear: kurtas, festive tops, embroidered garments, and layered silhouettes."
+          },
+          {
+            n: "02",
+            label: "Technical focus",
+            body: "StableVITON-compatible multimodal bundle generation with deterministic file mapping."
+          },
+          {
+            n: "03",
+            label: "Product goal",
+            body: "Reduce uncertainty in online purchase decisions with reliable visual fit previews."
+          }
+        ].map((card) => (
+          <motion.div
+            key={card.n}
+            variants={stageVariants}
+            className="rounded-2xl border border-slate-700 bg-slate-900 p-6 shadow-sm"
+            {...(reduceMotion ? {} : { whileHover: { y: -3, transition: { duration: 0.2 } } })}
+          >
+            <p className="text-3xl font-bold text-slate-100">{card.n}</p>
+            <p className="mt-2 text-sm font-semibold uppercase tracking-wide text-slate-400">{card.label}</p>
+            <p className="mt-3 text-slate-300 leading-relaxed">{card.body}</p>
+          </motion.div>
+        ))}
+      </motion.div>
 
-      <section className="mb-14">
-        <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-2">Interactive System Walkthrough</h2>
-        <p className="text-lg text-slate-600 max-w-3xl leading-relaxed dark:text-slate-400 mb-6">Select a stage to explore how our pipeline works in production.</p>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <motion.section
+        className="mb-14"
+        initial="hidden"
+        whileInView="show"
+        viewport={viewPort}
+        variants={staggerChildren(reduceMotion, 0.06)}
+      >
+        <motion.h2
+          variants={stageVariants}
+          className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-2"
+        >
+          Interactive System Walkthrough
+        </motion.h2>
+        <motion.p
+          variants={stageVariants}
+          className="text-lg text-slate-600 max-w-3xl leading-relaxed dark:text-slate-400 mb-6"
+        >
+          Select a stage to explore how our pipeline works in production.
+        </motion.p>
+        <motion.div variants={stageVariants} className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           {pipelineStages.map((stage, idx) => (
-            <button
+            <motion.button
               key={stage.id}
+              type="button"
               onClick={() => setActiveStage(idx)}
-              className={`text-left rounded-2xl border p-5 transition-all ${
+              {...tapHover}
+              className={`text-left rounded-2xl border p-5 transition-colors ${
                 activeStage === idx
                   ? "border-indigo-400 bg-indigo-950/60 shadow-sm ring-1 ring-indigo-400/40"
                   : "border-slate-700 bg-slate-900 hover:border-indigo-500/50 hover:bg-slate-800/90"
@@ -127,76 +195,131 @@ export default function AboutUs() {
               <p className="text-xs font-bold tracking-widest uppercase text-slate-400 mb-2">Stage {idx + 1}</p>
               <h3 className="text-lg font-semibold text-slate-100 mb-2">{stage.title}</h3>
               <p className="text-sm text-slate-300 leading-relaxed">{stage.short}</p>
-            </button>
+            </motion.button>
           ))}
-        </div>
-        <div className="mt-5 rounded-2xl border border-slate-700 bg-slate-900 p-6">
-          <h3 className="text-xl font-semibold text-slate-100 mb-3">{pipelineStages[activeStage].title}</h3>
-          <p className="text-slate-300 leading-relaxed">{pipelineStages[activeStage].detail}</p>
-        </div>
-      </section>
+        </motion.div>
+        <motion.div variants={stageVariants}>
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={activeStage}
+              layout
+              initial={reduceMotion ? false : { opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={reduceMotion ? undefined : { opacity: 0, y: -8 }}
+              transition={reduceMotion ? { duration: 0 } : { duration: 0.28, ease: easeOut }}
+              className="mt-5 rounded-2xl border border-slate-700 bg-slate-900 p-6"
+            >
+              <h3 className="text-xl font-semibold text-slate-100 mb-3">{pipelineStages[activeStage].title}</h3>
+              <p className="text-slate-300 leading-relaxed">{pipelineStages[activeStage].detail}</p>
+            </motion.div>
+          </AnimatePresence>
+        </motion.div>
+      </motion.section>
 
-      <section className="mb-14">
-        <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-2">What Makes Eastern Wear Harder</h2>
-        <p className="text-lg text-slate-600 max-w-3xl leading-relaxed dark:text-slate-400 mb-5">Switch between focus areas to see where our team is investing effort.</p>
-        <div className="flex flex-wrap gap-3 mb-5">
-          <button
-            onClick={() => setActiveChallenge("drape")}
-            className={`px-4 py-2 rounded-full text-sm font-semibold transition ${
-              activeChallenge === "drape" ? "bg-indigo-500 text-white shadow-md" : "bg-slate-900 border border-slate-600 text-slate-200 hover:border-indigo-400/50 hover:bg-slate-800"
-            }`}
-          >
-            Fabric Drape
-          </button>
-          <button
-            onClick={() => setActiveChallenge("embroidery")}
-            className={`px-4 py-2 rounded-full text-sm font-semibold transition ${
-              activeChallenge === "embroidery"
-                ? "bg-indigo-500 text-white shadow-md"
-                : "bg-slate-900 border border-slate-600 text-slate-200 hover:border-indigo-400/50 hover:bg-slate-800"
-            }`}
-          >
-            Embroidery
-          </button>
-          <button
-            onClick={() => setActiveChallenge("fit")}
-            className={`px-4 py-2 rounded-full text-sm font-semibold transition ${
-              activeChallenge === "fit" ? "bg-indigo-500 text-white shadow-md" : "bg-slate-900 border border-slate-600 text-slate-200 hover:border-indigo-400/50 hover:bg-slate-800"
-            }`}
-          >
-            Regional Fit
-          </button>
-        </div>
-        <div className="rounded-2xl border border-slate-700 bg-slate-900 p-6">
-          <h3 className="text-xl font-semibold text-slate-100 mb-4">{challengeFocus[activeChallenge].title}</h3>
-          <div className="space-y-3">
-            {challengeFocus[activeChallenge].points.map((point) => (
-              <p key={point} className="text-slate-300 leading-relaxed">
-                {point}
-              </p>
-            ))}
-          </div>
-        </div>
-      </section>
+      <motion.section
+        className="mb-14"
+        initial="hidden"
+        whileInView="show"
+        viewport={viewPort}
+        variants={staggerChildren(reduceMotion, 0.06)}
+      >
+        <motion.h2
+          variants={stageVariants}
+          className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-2"
+        >
+          What Makes Eastern Wear Harder
+        </motion.h2>
+        <motion.p
+          variants={stageVariants}
+          className="text-lg text-slate-600 max-w-3xl leading-relaxed dark:text-slate-400 mb-5"
+        >
+          Switch between focus areas to see where our team is investing effort.
+        </motion.p>
+        <motion.div variants={stageVariants} className="flex flex-wrap gap-3 mb-5">
+          {[
+            { id: "drape", label: "Fabric Drape" },
+            { id: "embroidery", label: "Embroidery" },
+            { id: "fit", label: "Regional Fit" }
+          ].map((tab) => (
+            <motion.button
+              key={tab.id}
+              type="button"
+              onClick={() => setActiveChallenge(tab.id)}
+              {...tapHover}
+              className={`px-4 py-2 rounded-full text-sm font-semibold transition-colors ${
+                activeChallenge === tab.id
+                  ? "bg-indigo-500 text-white shadow-md"
+                  : "bg-slate-900 border border-slate-600 text-slate-200 hover:border-indigo-400/50 hover:bg-slate-800"
+              }`}
+            >
+              {tab.label}
+            </motion.button>
+          ))}
+        </motion.div>
+        <motion.div variants={stageVariants}>
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={activeChallenge}
+              layout
+              initial={reduceMotion ? false : { opacity: 0, x: 12 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={reduceMotion ? undefined : { opacity: 0, x: -10 }}
+              transition={reduceMotion ? { duration: 0 } : { duration: 0.3, ease: easeOut }}
+              className="rounded-2xl border border-slate-700 bg-slate-900 p-6"
+            >
+              <h3 className="text-xl font-semibold text-slate-100 mb-4">{challengeFocus[activeChallenge].title}</h3>
+              <div className="space-y-3">
+                {challengeFocus[activeChallenge].points.map((point) => (
+                  <p key={point} className="text-slate-300 leading-relaxed">
+                    {point}
+                  </p>
+                ))}
+              </div>
+            </motion.div>
+          </AnimatePresence>
+        </motion.div>
+      </motion.section>
 
-      <section>
-        <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-4">Frequently Asked Questions</h2>
+      <motion.section
+        initial="hidden"
+        whileInView="show"
+        viewport={viewPort}
+        variants={staggerChildren(reduceMotion, 0.05)}
+      >
+        <motion.h2 variants={stageVariants} className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-4">
+          Frequently Asked Questions
+        </motion.h2>
         <div className="space-y-3">
           {faqs.map((item, idx) => (
-            <div key={item.q} className="rounded-2xl border border-slate-700 bg-slate-900 overflow-hidden">
+            <motion.div
+              key={item.q}
+              variants={stageVariants}
+              className="rounded-2xl border border-slate-700 bg-slate-900 overflow-hidden"
+            >
               <button
+                type="button"
                 onClick={() => setOpenFaq(openFaq === idx ? -1 : idx)}
                 className="w-full text-left px-5 py-4 flex items-center justify-between hover:bg-slate-800/80 transition-colors"
               >
                 <span className="font-semibold text-slate-100">{item.q}</span>
                 <span className="text-slate-400">{openFaq === idx ? "−" : "+"}</span>
               </button>
-              {openFaq === idx && <p className="px-5 pb-5 text-slate-300 leading-relaxed">{item.a}</p>}
-            </div>
+              <AnimatePresence initial={false}>
+                {openFaq === idx ? (
+                  <motion.div
+                    initial={reduceMotion ? false : { opacity: 0, y: -6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={reduceMotion ? undefined : { opacity: 0, y: -4 }}
+                    transition={reduceMotion ? { duration: 0 } : { duration: 0.22, ease: easeOut }}
+                  >
+                    <p className="px-5 pb-5 text-slate-300 leading-relaxed">{item.a}</p>
+                  </motion.div>
+                ) : null}
+              </AnimatePresence>
+            </motion.div>
           ))}
         </div>
-      </section>
+      </motion.section>
     </div>
   );
 }
-

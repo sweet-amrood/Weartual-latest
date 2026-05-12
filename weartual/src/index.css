@@ -22,6 +22,54 @@
   h1, h2, h3, h4, h5, h6 {
     @apply font-serif tracking-tight;
   }
+
+  /* Themed scrollbars — brand violet / slate (Firefox) */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(124 58 237) rgb(241 245 249);
+  }
+
+  html.dark *,
+  .dark * {
+    scrollbar-color: rgb(139 92 246 / 0.85) rgb(15 23 42);
+  }
+
+  /* WebKit (Chrome, Edge, Safari) */
+  *::-webkit-scrollbar {
+    width: 9px;
+    height: 9px;
+  }
+
+  *::-webkit-scrollbar-track {
+    background: rgb(241 245 249);
+    border-radius: 9999px;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, rgb(167 139 250), rgb(124 58 237));
+    border-radius: 9999px;
+    border: 2px solid rgb(241 245 249);
+  }
+
+  *::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, rgb(196 181 253), rgb(139 92 246));
+  }
+
+  html.dark *::-webkit-scrollbar-track,
+  .dark *::-webkit-scrollbar-track {
+    background: rgb(15 23 42);
+  }
+
+  html.dark *::-webkit-scrollbar-thumb,
+  .dark *::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, rgb(139 92 246 / 0.9), rgb(91 33 182 / 0.95));
+    border-color: rgb(15 23 42);
+  }
+
+  html.dark *::-webkit-scrollbar-thumb:hover,
+  .dark *::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, rgb(167 139 250 / 0.95), rgb(124 58 237));
+  }
 }
 
 @layer utilities {

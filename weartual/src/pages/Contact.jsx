@@ -1,5 +1,7 @@
 import { useState } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { submitFeedback } from "../services/feedbackApi";
+import { easeOut } from "../lib/motionPresets";
 
 const team = [
   {
@@ -32,6 +34,7 @@ const team = [
 ];
 
 export default function Contact() {
+  const reduceMotion = useReducedMotion();
   const [activeMember, setActiveMember] = useState(0);
   const [feedbackSent, setFeedbackSent] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -62,20 +65,32 @@ export default function Contact() {
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-14 sm:px-6 lg:px-8 text-slate-900 dark:text-slate-100">
-      <div className="text-center mb-12">
+      <motion.div
+        className="text-center mb-12"
+        initial={reduceMotion ? false : { opacity: 0, y: 14 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={reduceMotion ? { duration: 0 } : { duration: 0.45, ease: easeOut }}
+      >
         <h1 className="text-4xl font-bold text-slate-900 dark:text-slate-100 mb-4">Contact</h1>
         <p className="text-lg text-slate-600 max-w-2xl mx-auto leading-relaxed dark:text-slate-400">
           Have questions about the Virtual Try-On system? Reach out to our team.
         </p>
-      </div>
+      </motion.div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {team.map((m, idx) => (
-          <button
+          <motion.button
             key={m.name}
             type="button"
             onClick={() => setActiveMember((prev) => (prev === idx ? -1 : idx))}
-            className={`rounded-2xl p-6 shadow-sm border text-center transition-all duration-200 bg-slate-900 ${
+            layout
+            initial={reduceMotion ? false : { opacity: 0, y: 16 }}
+            whileInView={reduceMotion ? undefined : { opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-40px" }}
+            transition={reduceMotion ? { duration: 0 } : { duration: 0.4, ease: easeOut, delay: idx * 0.06 }}
+            whileHover={reduceMotion ? undefined : { y: -2 }}
+            whileTap={reduceMotion ? undefined : { scale: 0.99 }}
+            className={`rounded-2xl p-6 shadow-sm border text-center transition-colors duration-200 bg-slate-900 ${
               activeMember === idx
                 ? "border-indigo-400 ring-2 ring-indigo-500/30"
                 : "border-slate-700 hover:border-indigo-500/50"
@@ -110,11 +125,17 @@ export default function Contact() {
                 {m.phone}
               </a>
             </div>
-          </button>
+          </motion.button>
         ))}
       </div>
 
-      <div className="mt-12 rounded-2xl p-6 sm:p-8 shadow-sm border border-slate-700 bg-slate-900">
+      <motion.div
+        className="mt-12 rounded-2xl p-6 sm:p-8 shadow-sm border border-slate-700 bg-slate-900"
+        initial={reduceMotion ? false : { opacity: 0, y: 20 }}
+        whileInView={reduceMotion ? undefined : { opacity: 1, y: 0 }}
+        viewport={{ once: true, margin: "-60px" }}
+        transition={reduceMotion ? { duration: 0 } : { duration: 0.45, ease: easeOut }}
+      >
         <div className="mb-6">
           <h2 className="text-2xl font-bold text-slate-100 mb-2">Share Your Feedback</h2>
           <p className="text-lg text-slate-300 leading-relaxed">
@@ -181,44 +202,76 @@ export default function Contact() {
             />
           </div>
 
-          <button
+          <motion.button
             type="submit"
             disabled={isSubmitting}
-            className="inline-flex items-center justify-center rounded-xl bg-indigo-600 px-6 py-2.5 font-semibold text-white hover:bg-indigo-500 transition-colors"
+            whileHover={reduceMotion || isSubmitting ? undefined : { scale: 1.02 }}
+            whileTap={reduceMotion || isSubmitting ? undefined : { scale: 0.98 }}
+            transition={{ type: "spring", stiffness: 450, damping: 26 }}
+            className="inline-flex items-center justify-center rounded-xl bg-indigo-600 px-6 py-2.5 font-semibold text-white hover:bg-indigo-500 transition-colors disabled:opacity-60"
           >
             {isSubmitting ? "Sending..." : "Send Feedback"}
-          </button>
+          </motion.button>
 
-          {formError && (
-            <p className="text-sm text-red-200 bg-red-950/50 border border-red-800/80 rounded-xl px-4 py-3">
-              {formError}
-            </p>
-          )}
+          <AnimatePresence>
+            {formError ? (
+              <motion.p
+                key="contact-form-error"
+                role="alert"
+                initial={reduceMotion ? false : { opacity: 0, y: -6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={reduceMotion ? undefined : { opacity: 0 }}
+                className="text-sm text-red-200 bg-red-950/50 border border-red-800/80 rounded-xl px-4 py-3"
+              >
+                {formError}
+              </motion.p>
+            ) : null}
+          </AnimatePresence>
 
-          {feedbackSent && (
-            <p className="text-sm text-emerald-200 bg-emerald-950/40 border border-emerald-800/60 rounded-xl px-4 py-3">
-              Feedback submitted successfully
-            </p>
-          )}
+          <AnimatePresence>
+            {feedbackSent ? (
+              <motion.p
+                key="contact-form-success"
+                initial={reduceMotion ? false : { opacity: 0, y: -6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={reduceMotion ? undefined : { opacity: 0 }}
+                className="text-sm text-emerald-200 bg-emerald-950/40 border border-emerald-800/60 rounded-xl px-4 py-3"
+              >
+                Feedback submitted successfully
+              </motion.p>
+            ) : null}
+          </AnimatePresence>
         </form>
-      </div>
+      </motion.div>
 
       <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="rounded-2xl p-6 shadow-sm border border-slate-700 bg-slate-900">
+        <motion.div
+          className="rounded-2xl p-6 shadow-sm border border-slate-700 bg-slate-900"
+          initial={reduceMotion ? false : { opacity: 0, y: 16 }}
+          whileInView={reduceMotion ? undefined : { opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-40px" }}
+          transition={reduceMotion ? { duration: 0 } : { duration: 0.4, ease: easeOut }}
+        >
           <h3 className="text-lg font-semibold text-slate-100 mb-2">Expected Response Time</h3>
           <p className="text-slate-300 text-sm leading-relaxed">
             We usually review feedback within 24 to 48 hours. Priority is given to reproducible issues affecting
             eastern-wear fitting realism, garment alignment, and texture consistency.
           </p>
-        </div>
-        <div className="rounded-2xl p-6 shadow-sm border border-slate-700 bg-slate-900">
+        </motion.div>
+        <motion.div
+          className="rounded-2xl p-6 shadow-sm border border-slate-700 bg-slate-900"
+          initial={reduceMotion ? false : { opacity: 0, y: 16 }}
+          whileInView={reduceMotion ? undefined : { opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-40px" }}
+          transition={reduceMotion ? { duration: 0 } : { duration: 0.4, ease: easeOut, delay: 0.06 }}
+        >
           <h3 className="text-lg font-semibold text-slate-100 mb-2">Feedback That Helps Most</h3>
           <ul className="text-slate-300 text-sm leading-relaxed space-y-1 list-disc list-inside">
             <li>Outfit category (kurta, festive top, layered look)</li>
             <li>What looked off (sleeves, hemline, drape, embroidery)</li>
             <li>Whether issue is repeated across multiple uploads</li>
           </ul>
-        </div>
+        </motion.div>
       </div>
     </div>
   );

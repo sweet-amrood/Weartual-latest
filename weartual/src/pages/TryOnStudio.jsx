@@ -1,5 +1,6 @@
 import React, { useMemo, useRef, useState, useEffect, useLayoutEffect, useCallback } from "react";
 import { Link } from "react-router-dom";
+import { motion, useReducedMotion } from "motion/react";
 import { listDatasetSamples, uploadMyImage, deleteMyImage, deleteMyImageByResultUrl } from "../services/imageApi";
 import {
   Sparkles,
@@ -84,6 +85,7 @@ const inferResultIsVideo = (job) => {
 };
 
 export default function TryOnStudio({ user }) {
+  const reduceMotion = useReducedMotion();
   const [personFile, setPersonFile] = useState(null);
   const [garmentFile, setGarmentFile] = useState(null);
   const [personPreview, setPersonPreview] = useState(null);
@@ -660,8 +662,11 @@ export default function TryOnStudio({ user }) {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
       <div id="tour-studio-root" className="max-w-6xl mx-auto px-4 py-12">
-        <div
-          className="text-center mb-6 animate-fade-in-up relative isolate overflow-hidden rounded-3xl border border-white/10 bg-[#050814] min-h-[300px] sm:min-h-[340px] flex items-center justify-center px-5 sm:px-6"
+        <motion.div
+          className="text-center mb-6 relative isolate overflow-hidden rounded-3xl border border-white/10 bg-[#050814] min-h-[300px] sm:min-h-[340px] flex items-center justify-center px-5 sm:px-6"
+          initial={reduceMotion ? false : { opacity: 0, y: 18 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={reduceMotion ? { duration: 0 } : { duration: 0.48, ease: [0.22, 1, 0.36, 1] }}
           onMouseMove={handleHeroMouseMove}
           onMouseLeave={() => {
             heroTargetRef.current = { x: 50, y: 50 };
@@ -738,7 +743,7 @@ export default function TryOnStudio({ user }) {
               Upload your subject and garment. Our proprietary deep learning pipeline will synthesize a photorealistic rendering in seconds.
             </p>
           </div>
-        </div>
+        </motion.div>
         {error && (
           <div className="mb-4 rounded-xl border border-red-200 bg-red-50 text-red-700 p-3 text-sm">
             {AUTH_TRY_ON_ERROR_RE.test(error) ? (

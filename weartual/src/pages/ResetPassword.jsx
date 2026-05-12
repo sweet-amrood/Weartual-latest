@@ -1,9 +1,12 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { resetPassword as resetPasswordRequest } from "../services/authApi";
 import { Lock, ArrowRight, CheckCircle } from "lucide-react";
+import { easeOut } from "../lib/motionPresets";
 
 const ResetPassword = () => {
+  const reduceMotion = useReducedMotion();
   const { token } = useParams();
   const navigate = useNavigate();
   const [error, setError] = useState("");
@@ -50,7 +53,12 @@ const ResetPassword = () => {
   return (
     <div className="min-h-screen flex w-full font-sans bg-white dark:bg-slate-950 dark:text-slate-100">
       <div className="flex-1 flex flex-col justify-center px-6 sm:px-12 lg:px-20 xl:px-24">
-        <div className="mx-auto w-full max-w-sm lg:max-w-md animate-fade-in-up">
+        <motion.div
+          className="mx-auto w-full max-w-sm lg:max-w-md"
+          initial={reduceMotion ? false : { opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={reduceMotion ? { duration: 0 } : { duration: 0.42, ease: easeOut }}
+        >
           <div className="mb-10 text-center sm:text-left">
             <div className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-brand-900 text-white shadow-lg shadow-brand-500/30 mb-6">
               <span className="font-serif text-2xl font-bold italic">W</span>
@@ -59,16 +67,39 @@ const ResetPassword = () => {
             <p className="text-sm text-slate-500">Choose a new password for your Weartual account.</p>
           </div>
 
-          {error && (
-            <div className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-600 shadow-sm">{error}</div>
-          )}
+          <AnimatePresence>
+            {error ? (
+              <motion.div
+                key="reset-error"
+                role="alert"
+                layout
+                initial={reduceMotion ? false : { opacity: 0, y: -8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={reduceMotion ? undefined : { opacity: 0, y: -6 }}
+                transition={reduceMotion ? { duration: 0 } : { duration: 0.22, ease: easeOut }}
+                className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-600 shadow-sm"
+              >
+                {error}
+              </motion.div>
+            ) : null}
+          </AnimatePresence>
 
-          {message && (
-            <div className="mb-6 rounded-xl border border-green-200 bg-green-50 p-4 text-sm text-green-700 shadow-sm flex items-center gap-3">
-              <CheckCircle className="h-5 w-5 text-green-600 flex-shrink-0" />
-              {message}
-            </div>
-          )}
+          <AnimatePresence>
+            {message ? (
+              <motion.div
+                key="reset-success"
+                layout
+                initial={reduceMotion ? false : { opacity: 0, y: -6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={reduceMotion ? undefined : { opacity: 0 }}
+                transition={reduceMotion ? { duration: 0 } : { duration: 0.25, ease: easeOut }}
+                className="mb-6 rounded-xl border border-green-200 bg-green-50 p-4 text-sm text-green-700 shadow-sm flex items-center gap-3"
+              >
+                <CheckCircle className="h-5 w-5 text-green-600 flex-shrink-0" />
+                {message}
+              </motion.div>
+            ) : null}
+          </AnimatePresence>
 
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
@@ -114,9 +145,12 @@ const ResetPassword = () => {
               </div>
             </div>
 
-            <button
+            <motion.button
               type="submit"
               disabled={isSubmitting}
+              whileHover={reduceMotion || isSubmitting ? undefined : { scale: 1.01 }}
+              whileTap={reduceMotion || isSubmitting ? undefined : { scale: 0.99 }}
+              transition={{ type: "spring", stiffness: 500, damping: 28 }}
               className="flex w-full mt-2 items-center justify-center rounded-xl bg-slate-900 px-4 py-3.5 text-sm font-semibold text-white shadow-lg shadow-slate-900/20 hover:bg-slate-800 focus:outline-none focus:ring-4 focus:ring-slate-900/10 disabled:opacity-70 disabled:cursor-not-allowed transition-colors"
             >
               {isSubmitting ? (
@@ -127,7 +161,7 @@ const ResetPassword = () => {
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </>
               )}
-            </button>
+            </motion.button>
           </form>
 
           <p className="mt-10 text-center text-sm text-slate-600">
@@ -139,7 +173,7 @@ const ResetPassword = () => {
               Back to log in
             </Link>
           </p>
-        </div>
+        </motion.div>
       </div>
     </div>
   );

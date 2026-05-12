@@ -1,5 +1,7 @@
-import React, { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
+import { motion, useReducedMotion } from "motion/react";
+import { easeOut } from "../lib/motionPresets";
 import { GoogleLogin } from "@react-oauth/google";
 import {
   Camera,
@@ -30,6 +32,7 @@ const DEFAULT_AVATAR_OPTIONS = [
 ];
 
 export default function Profile({ user, onUserUpdated }) {
+  const reduceMotion = useReducedMotion();
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [username, setUsername] = useState(() => user?.username ?? "");
@@ -216,13 +219,26 @@ export default function Profile({ user, onUserUpdated }) {
     <div id="tour-profile-root" className="min-h-screen bg-slate-50 px-4 py-10 dark:bg-slate-950 dark:text-slate-100">
       <div className="max-w-3xl mx-auto">
         <div className="flex items-center gap-3 mb-8">
-          <div className="w-12 h-12 rounded-2xl bg-brand-100 text-brand-700 flex items-center justify-center">
+          <motion.div
+            className="w-12 h-12 rounded-2xl bg-brand-100 text-brand-700 flex items-center justify-center"
+            initial={reduceMotion ? false : { opacity: 0, scale: 0.92 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={
+              reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 380, damping: 22, delay: 0.02 }
+            }
+          >
             <User className="w-6 h-6" />
-          </div>
-          <div>
+          </motion.div>
+          <motion.div
+            initial={reduceMotion ? false : { opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={
+              reduceMotion ? { duration: 0 } : { duration: 0.42, ease: easeOut, delay: 0.08 }
+            }
+          >
             <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Profile</h1>
             <p className="text-sm text-slate-500 dark:text-slate-400">Manage your account, photo, and explore the app.</p>
-          </div>
+          </motion.div>
         </div>
 
         {loadError && (

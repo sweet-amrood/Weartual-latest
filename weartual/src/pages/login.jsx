@@ -1,10 +1,13 @@
-import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { GoogleLogin } from '@react-oauth/google';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { googleAuth, login as loginRequest } from '../services/authApi';
 import { Mail, Lock, EyeOff, Eye, ArrowRight } from 'lucide-react';
+import { easeOut, staggerChildren, fadeUpItem } from '../lib/motionPresets';
 
 const Login = ({ onLogin }) => {
+  const reduceMotion = useReducedMotion();
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -12,7 +15,6 @@ const Login = ({ onLogin }) => {
     email: '',
     password: ''
   });
-  const navigate = useNavigate();
 
   const handleInputChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -66,28 +68,66 @@ const Login = ({ onLogin }) => {
     <div className="min-h-screen flex w-full font-sans bg-white dark:bg-slate-950 dark:text-slate-100">
       {/* Left Form Section */}
       <div className="flex-1 flex flex-col justify-center px-6 sm:px-12 lg:px-20 xl:px-24">
-        <div className="mx-auto w-full max-w-sm lg:max-w-md animate-fade-in-up">
+        <motion.div
+          className="mx-auto w-full max-w-sm lg:max-w-md"
+          initial={reduceMotion ? false : { opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={
+            reduceMotion ? { duration: 0 } : { duration: 0.42, ease: easeOut }
+          }
+        >
           
-          <div className="mb-10 text-center sm:text-left">
-            <div className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-brand-900 text-white shadow-lg shadow-brand-500/30 mb-6">
+          <motion.div
+            className="mb-10 text-center sm:text-left"
+            variants={staggerChildren(reduceMotion, 0.07)}
+            initial="hidden"
+            animate="show"
+          >
+            <motion.div
+              variants={fadeUpItem(reduceMotion)}
+              className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-brand-900 text-white shadow-lg shadow-brand-500/30 mb-6"
+            >
               <span className="font-serif text-2xl font-bold italic">W</span>
-            </div>
-            <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight text-slate-900 dark:text-slate-100 mb-2">
+            </motion.div>
+            <motion.h1
+              variants={fadeUpItem(reduceMotion)}
+              className="text-3xl sm:text-4xl font-semibold tracking-tight text-slate-900 dark:text-slate-100 mb-2"
+            >
               Welcome back
-            </h1>
-            <p className="text-sm text-slate-500 dark:text-slate-400">
+            </motion.h1>
+            <motion.p
+              variants={fadeUpItem(reduceMotion)}
+              className="text-sm text-slate-500 dark:text-slate-400"
+            >
               Enter your details to access your virtual try-on experience.
-            </p>
-          </div>
+            </motion.p>
+          </motion.div>
 
-          {error && (
-            <div className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-600 shadow-sm animate-fade-in-up">
-              {error}
-            </div>
-          )}
+          <AnimatePresence>
+            {error ? (
+              <motion.div
+                key="login-error"
+                role="alert"
+                layout
+                initial={reduceMotion ? false : { opacity: 0, y: -8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={reduceMotion ? undefined : { opacity: 0, y: -6 }}
+                transition={reduceMotion ? { duration: 0 } : { duration: 0.22, ease: easeOut }}
+                className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-600 shadow-sm dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-300"
+              >
+                {error}
+              </motion.div>
+            ) : null}
+          </AnimatePresence>
 
-          <form onSubmit={handleLogin} className="space-y-5">
-            <div>
+          <motion.form
+            onSubmit={handleLogin}
+            className="space-y-5"
+            variants={staggerChildren(reduceMotion, 0.06)}
+            initial="hidden"
+            animate="show"
+          >
+            <motion.div variants={fadeUpItem(reduceMotion)}>
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5" htmlFor="email">
                 Email Address
               </label>
@@ -106,9 +146,9 @@ const Login = ({ onLogin }) => {
                   className="block w-full rounded-xl border border-slate-300 bg-white py-3 pl-11 pr-4 text-slate-900 transition-all placeholder:text-slate-400 focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 sm:text-sm dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500"
                 />
               </div>
-            </div>
+            </motion.div>
 
-            <div>
+            <motion.div variants={fadeUpItem(reduceMotion)}>
               <div className="flex items-center justify-between mb-1.5">
                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300" htmlFor="password">
                   Password
@@ -139,12 +179,16 @@ const Login = ({ onLogin }) => {
                   {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                 </button>
               </div>
-            </div>
+            </motion.div>
 
-            <button
+            <motion.button
               type="submit"
               disabled={isSubmitting}
-              className="flex w-full mt-2 items-center justify-center rounded-xl bg-slate-900 px-4 py-3.5 text-sm font-semibold text-white shadow-lg shadow-slate-900/20 hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white dark:shadow-none focus:outline-none focus:ring-4 focus:ring-slate-900/10 dark:focus:ring-white/20 disabled:opacity-70 disabled:cursor-not-allowed transition-all"
+              variants={fadeUpItem(reduceMotion)}
+              whileHover={reduceMotion || isSubmitting ? undefined : { scale: 1.01 }}
+              whileTap={reduceMotion || isSubmitting ? undefined : { scale: 0.99 }}
+              transition={{ type: 'spring', stiffness: 500, damping: 28 }}
+              className="flex w-full mt-2 items-center justify-center rounded-xl bg-slate-900 px-4 py-3.5 text-sm font-semibold text-white shadow-lg shadow-slate-900/20 hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white dark:shadow-none focus:outline-none focus:ring-4 focus:ring-slate-900/10 dark:focus:ring-white/20 disabled:opacity-70 disabled:cursor-not-allowed transition-colors"
             >
               {isSubmitting ? (
                 <div className="h-5 w-5 animate-spin rounded-full border-2 border-slate-300 border-t-white"></div>
@@ -154,10 +198,17 @@ const Login = ({ onLogin }) => {
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </>
               )}
-            </button>
-          </form>
+            </motion.button>
+          </motion.form>
 
-          <div className="mt-8 mb-6">
+          <motion.div
+            className="mt-8 mb-6"
+            initial={reduceMotion ? false : { opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={
+              reduceMotion ? { duration: 0 } : { duration: 0.35, ease: easeOut, delay: 0.28 }
+            }
+          >
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
                 <div className="w-full border-t border-slate-200 dark:border-slate-700"></div>
@@ -166,9 +217,16 @@ const Login = ({ onLogin }) => {
                 <span className="bg-white dark:bg-slate-950 px-4 text-slate-500 dark:text-slate-400 font-medium">Or continue with</span>
               </div>
             </div>
-          </div>
+          </motion.div>
 
-          <div className="flex justify-center">
+          <motion.div
+            className="flex justify-center"
+            initial={reduceMotion ? false : { opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={
+              reduceMotion ? { duration: 0 } : { duration: 0.35, ease: easeOut, delay: 0.34 }
+            }
+          >
             <GoogleLogin
               onSuccess={handleGoogleLogin}
               onError={() => setError('Google authentication failed. Please try again.')}
@@ -177,15 +235,22 @@ const Login = ({ onLogin }) => {
               size="large"
               width="360"
             />
-          </div>
+          </motion.div>
 
-          <p className="mt-10 text-center text-sm text-slate-600 dark:text-slate-400">
+          <motion.p
+            className="mt-10 text-center text-sm text-slate-600 dark:text-slate-400"
+            initial={reduceMotion ? false : { opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={
+              reduceMotion ? { duration: 0 } : { duration: 0.35, ease: easeOut, delay: 0.4 }
+            }
+          >
             Don't have an account?{' '}
             <Link to="/signup" className="font-semibold text-brand-600 hover:text-brand-700 transition-colors">
               Sign up for free
             </Link>
-          </p>
-        </div>
+          </motion.p>
+        </motion.div>
       </div>
 
       {/* Right Image Section */}
@@ -199,17 +264,45 @@ const Login = ({ onLogin }) => {
         <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 via-slate-900/20 to-transparent z-10"></div>
         
         {/* Overlaid Content */}
-        <div className="absolute bottom-0 left-0 right-0 p-12 z-20 text-white animate-fade-in-up">
-          <div className="glass-dark inline-block px-4 py-2 rounded-lg mb-4 text-xs font-bold tracking-wider uppercase text-brand-100">
+        <motion.div
+          className="absolute bottom-0 left-0 right-0 p-12 z-20 text-white"
+          initial={reduceMotion ? false : { opacity: 0, y: 28 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={
+            reduceMotion ? { duration: 0 } : { duration: 0.55, ease: easeOut, delay: 0.08 }
+          }
+        >
+          <motion.div
+            className="glass-dark inline-block px-4 py-2 rounded-lg mb-4 text-xs font-bold tracking-wider uppercase text-brand-100"
+            initial={reduceMotion ? false : { opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={
+              reduceMotion ? { duration: 0 } : { duration: 0.4, ease: easeOut, delay: 0.14 }
+            }
+          >
             Premium Experience
-          </div>
-          <h2 className="text-4xl font-serif font-medium leading-tight mb-4">
-            See it on you.<br/>Before you buy.
-          </h2>
-          <p className="text-lg text-slate-300 max-w-md">
+          </motion.div>
+          <motion.h2
+            className="text-4xl font-serif font-medium leading-tight mb-4"
+            initial={reduceMotion ? false : { opacity: 0, y: 14 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={
+              reduceMotion ? { duration: 0 } : { duration: 0.45, ease: easeOut, delay: 0.2 }
+            }
+          >
+            See it on you.<br />Before you buy.
+          </motion.h2>
+          <motion.p
+            className="text-lg text-slate-300 max-w-md"
+            initial={reduceMotion ? false : { opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={
+              reduceMotion ? { duration: 0 } : { duration: 0.45, ease: easeOut, delay: 0.26 }
+            }
+          >
             Our advanced AI matching technology creates a flawless virtual reflection, enabling the perfect fit every time.
-          </p>
-        </div>
+          </motion.p>
+        </motion.div>
       </div>
     </div>
   );

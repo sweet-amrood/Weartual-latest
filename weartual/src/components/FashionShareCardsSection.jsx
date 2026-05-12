@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { toPng } from "html-to-image";
 import {
   ChevronLeft,
@@ -13,6 +14,7 @@ import {
   MessageCircle
 } from "lucide-react";
 import { listMyImages } from "../services/imageApi";
+import { easeOut } from "../lib/motionPresets";
 
 const CARD_W = 1080;
 const CARD_H = 1350;
@@ -173,6 +175,7 @@ export default function FashionShareCardsSection({ username }) {
   const previewWrapRef = useRef(null);
   const [previewScale, setPreviewScale] = useState(0.36);
   const [logoSrc, setLogoSrc] = useState("/favicon.svg");
+  const reduceMotion = useReducedMotion();
 
   useEffect(() => {
     setLogoSrc(`${window.location.origin}/favicon.svg`);
@@ -534,21 +537,30 @@ export default function FashionShareCardsSection({ username }) {
                   height: CARD_H * previewScale
                 }}
               >
-                <div
-                  className="origin-top-left transition-opacity duration-500 ease-out"
-                  style={{
-                    transform: `scale(${previewScale})`,
-                    opacity: imageReady ? 1 : 0.88
-                  }}
-                >
-                  <FashionCardInterior
-                    imageUrl={imageUrl}
-                    username={safeUsername}
-                    logoSrc={logoSrc}
-                    onResultImageLoad={bumpImageReady}
-                    onResultImageError={bumpImageReady}
-                  />
-                </div>
+                <AnimatePresence mode="wait">
+                  <motion.div
+                    key={`${lookIndex}-${imageUrl || "none"}`}
+                    className="origin-top-left"
+                    style={{
+                      transform: `scale(${previewScale})`,
+                      transformOrigin: "top left"
+                    }}
+                    initial={reduceMotion ? false : { opacity: 0.45 }}
+                    animate={{
+                      opacity: imageReady ? 1 : 0.88
+                    }}
+                    exit={reduceMotion ? undefined : { opacity: 0 }}
+                    transition={reduceMotion ? { duration: 0 } : { duration: 0.28, ease: easeOut }}
+                  >
+                    <FashionCardInterior
+                      imageUrl={imageUrl}
+                      username={safeUsername}
+                      logoSrc={logoSrc}
+                      onResultImageLoad={bumpImageReady}
+                      onResultImageError={bumpImageReady}
+                    />
+                  </motion.div>
+                </AnimatePresence>
               </div>
             </div>
 

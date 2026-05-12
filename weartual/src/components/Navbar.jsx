@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { logout as logoutRequest } from "../services/authApi";
 import { LogOut, Home, Info, Mail, Menu, X, Sparkles, History, Sun, Moon } from "lucide-react";
@@ -9,6 +10,7 @@ export default function Navbar({ user, onLogout }) {
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const reduceMotion = useReducedMotion();
 
   const handleLogout = async () => {
     try {
@@ -186,11 +188,19 @@ export default function Navbar({ user, onLogout }) {
           </div>
         </div>
 
-        {!isAuthRoute && mobileMenuOpen && (
-          <div
-            id="mobile-nav-menu"
-            className="md:hidden mb-4 rounded-2xl border border-slate-200 bg-white/95 backdrop-blur p-4 shadow-lg dark:border-slate-600 dark:bg-slate-900/95"
-          >
+        <AnimatePresence>
+          {!isAuthRoute && mobileMenuOpen ? (
+            <motion.div
+              id="mobile-nav-menu"
+              key="mobile-nav-menu"
+              initial={reduceMotion ? false : { opacity: 0, y: -10, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={reduceMotion ? undefined : { opacity: 0, y: -8, scale: 0.98 }}
+              transition={
+                reduceMotion ? { duration: 0 } : { duration: 0.28, ease: [0.22, 1, 0.36, 1] }
+              }
+              className="md:hidden mb-4 overflow-hidden rounded-2xl border border-slate-200 bg-white/95 backdrop-blur p-4 shadow-lg dark:border-slate-600 dark:bg-slate-900/95"
+            >
             <div className="flex flex-col gap-2">
               <NavLink
                 to="/"
@@ -284,8 +294,9 @@ export default function Navbar({ user, onLogout }) {
                 </div>
               )}
             </div>
-          </div>
-        )}
+            </motion.div>
+          ) : null}
+        </AnimatePresence>
       </div>
     </nav>
   );
