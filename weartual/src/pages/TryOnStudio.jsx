@@ -1,6 +1,27 @@
 import React, { useMemo, useRef, useState, useEffect } from "react";
 import { listDatasetSamples, uploadMyImage, deleteMyImage, deleteMyImageByResultUrl } from "../services/imageApi";
-import { Sparkles, Trash2, Download, Maximize2, X, ArrowRight, ThumbsUp, ThumbsDown, Star, MessageCircle, Music2, Link2, Share2, Send } from "lucide-react";
+import {
+  Sparkles,
+  Trash2,
+  Download,
+  Maximize2,
+  X,
+  ArrowRight,
+  ThumbsUp,
+  ThumbsDown,
+  Star,
+  MessageCircle,
+  Music2,
+  Link2,
+  Share2,
+  Send,
+  Code2,
+  Terminal,
+  Layers,
+  Cpu,
+  Box,
+  Wand2
+} from "lucide-react";
 import StyleInsightsPanel from "../components/StyleInsightsPanel";
 import {
   addOutfitHistoryEntry,
@@ -44,6 +65,17 @@ const pickRandomItems = (items, count = 4) => {
 const VIDEO_NAME_RE = /\.(mp4|webm|mov|m4v)$/i;
 const IMAGE_NAME_RE = /\.(jpe?g|png|webp)$/i;
 
+/** Floating “tool collection” chips — Antigravity-style hero dock (positions %, parallax multiplier, animation delay). */
+const HERO_DOCK_ITEMS = [
+  { Icon: Sparkles, top: "10%", left: "6%", delay: "0s", mul: 0.42 },
+  { Icon: Code2, top: "14%", right: "10%", delay: "0.4s", mul: -0.38 },
+  { Icon: Terminal, top: "62%", left: "4%", delay: "0.9s", mul: 0.5 },
+  { Icon: Layers, top: "58%", right: "6%", delay: "1.1s", mul: -0.32 },
+  { Icon: Cpu, top: "8%", left: "44%", delay: "0.2s", mul: 0.28 },
+  { Icon: Box, top: "72%", left: "38%", delay: "1.4s", mul: 0.36 },
+  { Icon: Wand2, top: "22%", right: "28%", delay: "0.65s", mul: -0.44 }
+];
+
 /** Prefer <video> when API mis-labels OpenCV MP4 as image, or URL is clearly Cloudinary video delivery. */
 const inferResultIsVideo = (job) => {
   if (!job) return false;
@@ -67,6 +99,8 @@ export default function TryOnStudio({ user }) {
   const [personSamples, setPersonSamples] = useState([]);
   const [clothSamples, setClothSamples] = useState([]);
   const [heroGlow, setHeroGlow] = useState({ x: 50, y: 50 });
+  /** Slower follow for icon dock / mesh — weightless parallax vs spotlight */
+  const [heroParallax, setHeroParallax] = useState({ x: 50, y: 50 });
   const [isTouchDevice, setIsTouchDevice] = useState(false);
   const [activeStageIndex, setActiveStageIndex] = useState(0);
   const [stageVisible, setStageVisible] = useState(true);
@@ -135,8 +169,12 @@ export default function TryOnStudio({ user }) {
     let frameId;
     const animate = () => {
       setHeroGlow((prev) => ({
-        x: prev.x + (heroTargetRef.current.x - prev.x) * 0.14,
-        y: prev.y + (heroTargetRef.current.y - prev.y) * 0.14
+        x: prev.x + (heroTargetRef.current.x - prev.x) * 0.09,
+        y: prev.y + (heroTargetRef.current.y - prev.y) * 0.09
+      }));
+      setHeroParallax((prev) => ({
+        x: prev.x + (heroTargetRef.current.x - prev.x) * 0.042,
+        y: prev.y + (heroTargetRef.current.y - prev.y) * 0.042
       }));
       frameId = window.requestAnimationFrame(animate);
     };
@@ -536,7 +574,7 @@ export default function TryOnStudio({ user }) {
     <div className="min-h-screen bg-slate-50 text-slate-900">
       <div className="max-w-6xl mx-auto px-4 py-12">
         <div
-          className="text-center mb-6 animate-fade-in-up relative isolate overflow-hidden rounded-3xl border border-slate-200 bg-slate-950 min-h-[280px] sm:min-h-[320px] flex items-center justify-center px-5 sm:px-6"
+          className="text-center mb-6 animate-fade-in-up relative isolate overflow-hidden rounded-3xl border border-white/10 bg-[#050814] min-h-[300px] sm:min-h-[340px] flex items-center justify-center px-5 sm:px-6 shadow-[0_0_0_1px_rgba(255,255,255,0.06),0_24px_80px_rgba(15,23,42,0.65)]"
           onMouseMove={handleHeroMouseMove}
           onMouseLeave={() => {
             heroTargetRef.current = { x: 50, y: 50 };
@@ -544,50 +582,72 @@ export default function TryOnStudio({ user }) {
           onTouchStart={handleHeroTouchMove}
           onTouchMove={handleHeroTouchMove}
         >
+          {/* Spotlight follows pointer (faster layer) */}
           <div
             className="absolute inset-0"
             style={{
-              background: `radial-gradient(560px circle at ${heroGlow.x}% ${heroGlow.y}%, rgba(129,140,248,0.26), rgba(2,6,23,0.97) 58%)`
+              background: `radial-gradient(520px circle at ${heroGlow.x}% ${heroGlow.y}%, rgba(99,102,241,0.22), rgba(5,8,20,0.96) 55%)`
             }}
           />
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_30%,rgba(244,114,182,0.16),transparent_45%)]" />
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_25%_75%,rgba(56,189,248,0.14),transparent_48%)]" />
+          {/* Slower parallax mesh — Antigravity-style ambient depth */}
           <div
-            className="absolute pointer-events-none w-[420px] h-[420px] rounded-full blur-3xl"
+            className="absolute inset-0 opacity-90"
             style={{
-              left: `calc(${heroGlow.x}% - 210px)`,
-              top: `calc(${heroGlow.y}% - 210px)`,
+              background: `
+                radial-gradient(ellipse 80% 50% at ${heroParallax.x * 0.85 + 8}% ${heroParallax.y * 0.7 + 10}%, rgba(236,72,153,0.12), transparent 52%),
+                radial-gradient(ellipse 70% 45% at ${100 - heroParallax.x * 0.9}% ${100 - heroParallax.y * 0.75}%, rgba(56,189,248,0.1), transparent 50%)
+              `
+            }}
+          />
+          <div
+            className="absolute pointer-events-none w-[min(480px,90vw)] h-[min(480px,90vw)] max-w-[520px] max-h-[520px] rounded-full blur-3xl opacity-90"
+            style={{
+              left: `calc(${heroGlow.x}% - min(240px,45vw))`,
+              top: `calc(${heroGlow.y}% - min(240px,45vw))`,
               background:
-                "radial-gradient(circle, rgba(124,58,237,0.32) 0%, rgba(59,130,246,0.24) 35%, rgba(236,72,153,0.2) 58%, rgba(255,255,255,0) 75%)"
+                "radial-gradient(circle, rgba(124,58,237,0.28) 0%, rgba(59,130,246,0.18) 38%, rgba(236,72,153,0.12) 62%, rgba(255,255,255,0) 72%)"
             }}
           />
-          <div
-            className="absolute inset-0 opacity-20 select-none pointer-events-none"
-            style={{
-              transform: `translate(${(heroGlow.x - 50) * 0.06}px, ${(heroGlow.y - 50) * 0.05}px)`,
-              transition: "transform 120ms linear"
-            }}
-          >
-            <p className="absolute -top-4 left-6 text-[72px] sm:text-[104px] font-black tracking-tight text-white/20">WEARTUAL</p>
-            <p className="absolute top-20 right-7 text-[50px] sm:text-[76px] font-extrabold tracking-tight text-white/20">VIRTUAL</p>
-            <p className="absolute bottom-1 left-10 text-[40px] sm:text-[60px] font-bold tracking-tight text-white/20">TRY-ON</p>
-          </div>
-          <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.06)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.06)_1px,transparent_1px)] bg-[size:28px_28px] opacity-35" />
+          {/* Horizon glow */}
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-indigo-500/[0.07] via-transparent to-transparent" />
+          {/* Floating tool dock — icon constellation + slow float */}
+          {HERO_DOCK_ITEMS.map(({ Icon, top, left, right, delay, mul }, idx) => (
+            <div
+              key={`dock-${idx}`}
+              className="absolute z-[5] pointer-events-none"
+              style={{
+                top,
+                ...(left != null ? { left } : {}),
+                ...(right != null ? { right } : {}),
+                transform: `translate(${(heroParallax.x - 50) * 0.72 * mul}px, ${(heroParallax.y - 50) * 0.58 * mul}px)`,
+                willChange: "transform"
+              }}
+            >
+              <div
+                className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/15 bg-gradient-to-br from-[rgba(255,255,255,0.14)] to-[rgba(255,255,255,0.03)] shadow-[0_12px_40px_rgba(0,0,0,0.45)] backdrop-blur-md sm:h-[3.25rem] sm:w-[3.25rem] animate-antigravity-dock-float"
+                style={{ animationDelay: delay }}
+              >
+                <Icon className="h-[1.15rem] w-[1.15rem] text-white/75 sm:h-5 sm:w-5" strokeWidth={1.5} />
+              </div>
+            </div>
+          ))}
+          <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.045)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.045)_1px,transparent_1px)] bg-[size:24px_24px] opacity-[0.28]" />
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_0%,rgba(3,7,18,0.55)_100%)]" />
           <div className="relative z-10">
-            <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-white/30 bg-white/10 backdrop-blur-md shadow-sm mb-5">
-              <Sparkles className="w-4 h-4 text-white" />
-              <span className="text-xs font-bold tracking-wider uppercase text-white/90">Weartual Neural Engine v2.0</span>
+            <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-white/20 bg-white/[0.08] backdrop-blur-md shadow-sm mb-5">
+              <Sparkles className="w-4 h-4 text-cyan-200/90" />
+              <span className="text-xs font-bold tracking-wider uppercase text-white/85">Weartual Neural Engine v2.0</span>
             </span>
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl leading-[1.15] font-bold mb-3 text-slate-900">
-              <span className="inline-block text-transparent bg-clip-text bg-gradient-to-r from-indigo-200 via-fuchsia-200 to-cyan-200">
+            <h1 className="text-4xl sm:text-5xl lg:text-6xl leading-[1.15] font-bold mb-3 font-sans tracking-tight">
+              <span className="inline-block text-transparent bg-clip-text bg-gradient-to-r from-slate-100 via-indigo-100 to-cyan-100">
                 Achieve flawless fits.
               </span>
               <br />
-              <span className="inline-block text-transparent bg-clip-text bg-gradient-to-r from-cyan-200 via-indigo-200 to-fuchsia-200">
+              <span className="inline-block text-transparent bg-clip-text bg-gradient-to-r from-cyan-100 via-violet-100 to-fuchsia-100">
                 Powered by WEARTUAL.
               </span>
             </h1>
-            <p className="text-white/85 max-w-2xl mx-auto">
+            <p className="text-white/75 max-w-2xl mx-auto text-[0.95rem] sm:text-base leading-relaxed">
               Upload your subject and garment. Our proprietary deep learning pipeline will synthesize a photorealistic rendering in seconds.
             </p>
           </div>

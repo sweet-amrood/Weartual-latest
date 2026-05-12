@@ -44,3 +44,18 @@
     transform: translateY(0);
   }
 }
+
+/* Try On Studio hero — slow “dock” float (Antigravity-style ambient motion) */
+@keyframes antigravityDockFloat {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+.animate-antigravity-dock-float {
+  animation: antigravityDockFloat 6.5s ease-in-out infinite;
+}
