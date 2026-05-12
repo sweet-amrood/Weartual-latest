@@ -63,7 +63,7 @@ const Login = ({ onLogin }) => {
   };
 
   return (
-    <div className="min-h-screen flex w-full font-sans bg-white">
+    <div className="min-h-screen flex w-full font-sans bg-white dark:bg-slate-950 dark:text-slate-100">
       {/* Left Form Section */}
       <div className="flex-1 flex flex-col justify-center px-6 sm:px-12 lg:px-20 xl:px-24">
         <div className="mx-auto w-full max-w-sm lg:max-w-md animate-fade-in-up">
@@ -72,10 +72,10 @@ const Login = ({ onLogin }) => {
             <div className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-brand-900 text-white shadow-lg shadow-brand-500/30 mb-6">
               <span className="font-serif text-2xl font-bold italic">W</span>
             </div>
-            <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight text-slate-900 mb-2">
+            <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight text-slate-900 dark:text-slate-100 mb-2">
               Welcome back
             </h1>
-            <p className="text-sm text-slate-500">
+            <p className="text-sm text-slate-500 dark:text-slate-400">
               Enter your details to access your virtual try-on experience.
             </p>
           </div>
@@ -88,7 +88,7 @@ const Login = ({ onLogin }) => {
 
           <form onSubmit={handleLogin} className="space-y-5">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5" htmlFor="email">
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5" htmlFor="email">
                 Email Address
               </label>
               <div className="relative">
@@ -103,14 +103,14 @@ const Login = ({ onLogin }) => {
                   placeholder="hello@example.com"
                   value={formData.email}
                   onChange={handleInputChange}
-                  className="block w-full rounded-xl border border-slate-300 bg-white py-3 pl-11 pr-4 text-slate-900 transition-all placeholder:text-slate-400 focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 sm:text-sm"
+                  className="block w-full rounded-xl border border-slate-300 bg-white py-3 pl-11 pr-4 text-slate-900 transition-all placeholder:text-slate-400 focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 sm:text-sm dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500"
                 />
               </div>
             </div>
 
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <label className="block text-sm font-medium text-slate-700" htmlFor="password">
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300" htmlFor="password">
                   Password
                 </label>
                 <Link to="/forgot-password" className="text-sm font-medium text-brand-600 hover:text-brand-500 transition-colors">
@@ -129,7 +129,7 @@ const Login = ({ onLogin }) => {
                   placeholder="••••••••"
                   value={formData.password}
                   onChange={handleInputChange}
-                  className="block w-full rounded-xl border border-slate-300 bg-white py-3 pl-11 pr-11 text-slate-900 transition-all placeholder:text-slate-400 focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 sm:text-sm"
+                  className="block w-full rounded-xl border border-slate-300 bg-white py-3 pl-11 pr-11 text-slate-900 transition-all placeholder:text-slate-400 focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 sm:text-sm dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500"
                 />
                 <button
                   type="button"
@@ -144,7 +144,7 @@ const Login = ({ onLogin }) => {
             <button
               type="submit"
               disabled={isSubmitting}
-              className="flex w-full mt-2 items-center justify-center rounded-xl bg-slate-900 px-4 py-3.5 text-sm font-semibold text-white shadow-lg shadow-slate-900/20 hover:bg-slate-800 focus:outline-none focus:ring-4 focus:ring-slate-900/10 disabled:opacity-70 disabled:cursor-not-allowed transition-all"
+              className="flex w-full mt-2 items-center justify-center rounded-xl bg-slate-900 px-4 py-3.5 text-sm font-semibold text-white shadow-lg shadow-slate-900/20 hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white dark:shadow-none focus:outline-none focus:ring-4 focus:ring-slate-900/10 dark:focus:ring-white/20 disabled:opacity-70 disabled:cursor-not-allowed transition-all"
             >
               {isSubmitting ? (
                 <div className="h-5 w-5 animate-spin rounded-full border-2 border-slate-300 border-t-white"></div>
@@ -160,10 +160,10 @@ const Login = ({ onLogin }) => {
           <div className="mt-8 mb-6">
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-slate-200"></div>
+                <div className="w-full border-t border-slate-200 dark:border-slate-700"></div>
               </div>
               <div className="relative flex justify-center text-sm">
-                <span className="bg-white px-4 text-slate-500 font-medium">Or continue with</span>
+                <span className="bg-white dark:bg-slate-950 px-4 text-slate-500 dark:text-slate-400 font-medium">Or continue with</span>
               </div>
             </div>
           </div>
@@ -179,7 +179,7 @@ const Login = ({ onLogin }) => {
             />
           </div>
 
-          <p className="mt-10 text-center text-sm text-slate-600">
+          <p className="mt-10 text-center text-sm text-slate-600 dark:text-slate-400">
             Don't have an account?{' '}
             <Link to="/signup" className="font-semibold text-brand-600 hover:text-brand-700 transition-colors">
               Sign up for free

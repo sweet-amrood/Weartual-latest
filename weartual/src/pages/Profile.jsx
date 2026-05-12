@@ -16,13 +16,6 @@ import {
 } from "lucide-react";
 import { getMe, patchMe, uploadMyAvatar } from "../services/authApi";
 
-const PRESETS = [
-  { value: "", label: "No preset" },
-  { value: "minimal", label: "Minimal" },
-  { value: "studio", label: "Studio" },
-  { value: "neon", label: "Neon" }
-];
-
 /** Built-in illustrated avatars (DiceBear); stored as `avatarUrl` via PATCH. */
 const DEFAULT_AVATAR_OPTIONS = [
   { id: "aurora", label: "Aurora", url: "https://api.dicebear.com/7.x/avataaars/svg?seed=WeartualAurora&radius=50&backgroundColor=b6e3f4" },
@@ -38,7 +31,6 @@ export default function Profile({ user, onUserUpdated }) {
   const [loadError, setLoadError] = useState("");
   const [username, setUsername] = useState(() => user?.username ?? "");
   const [email, setEmail] = useState(() => user?.email ?? "");
-  const [avatarPreset, setAvatarPreset] = useState(() => user?.avatarPreset ?? "");
   const [currentPassword, setCurrentPassword] = useState("");
   const [profileMessage, setProfileMessage] = useState("");
   const [profileError, setProfileError] = useState("");
@@ -52,7 +44,6 @@ export default function Profile({ user, onUserUpdated }) {
     if (!u) return;
     setUsername(u.username || "");
     setEmail(u.email || "");
-    setAvatarPreset(u.avatarPreset ?? "");
   }, []);
 
   useEffect(() => {
@@ -90,15 +81,11 @@ export default function Profile({ user, onUserUpdated }) {
     setProfileMessage("");
     const nextUser = {
       username: username.trim(),
-      email: email.trim().toLowerCase(),
-      avatarPreset: avatarPreset || null
+      email: email.trim().toLowerCase()
     };
     const payload = {};
     if (nextUser.username !== (displayUser?.username || "")) payload.username = nextUser.username;
     if (nextUser.email !== (displayUser?.email || "").toLowerCase()) payload.email = nextUser.email;
-    const presetNorm = nextUser.avatarPreset || null;
-    const prevPreset = displayUser?.avatarPreset ?? null;
-    if (presetNorm !== prevPreset) payload.avatarPreset = presetNorm;
 
     if (Object.keys(payload).length === 0) {
       setProfileMessage("Nothing to save.");
@@ -139,7 +126,6 @@ export default function Profile({ user, onUserUpdated }) {
       if (res?.user) {
         onUserUpdated?.(res.user);
         applyUser(res.user);
-        setAvatarPreset(res.user.avatarPreset ?? "");
       }
       setAvatarMessage("Photo updated.");
     } catch (err) {
@@ -154,7 +140,7 @@ export default function Profile({ user, onUserUpdated }) {
     setAvatarMessage("");
     setAvatarBusy(true);
     try {
-      const res = await patchMe({ avatarUrl: url, avatarPreset: null });
+      const res = await patchMe({ avatarUrl: url });
       if (res?.user) {
         onUserUpdated?.(res.user);
         applyUser(res.user);
@@ -172,7 +158,7 @@ export default function Profile({ user, onUserUpdated }) {
     setAvatarMessage("");
     setAvatarBusy(true);
     try {
-      const res = await patchMe({ avatarUrl: null, avatarPreset: null });
+      const res = await patchMe({ avatarUrl: null });
       if (res?.user) {
         onUserUpdated?.(res.user);
         applyUser(res.user);
@@ -194,15 +180,15 @@ export default function Profile({ user, onUserUpdated }) {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 px-4 py-10">
+    <div className="min-h-screen bg-slate-50 px-4 py-10 dark:bg-slate-950 dark:text-slate-100">
       <div className="max-w-3xl mx-auto">
         <div className="flex items-center gap-3 mb-8">
           <div className="w-12 h-12 rounded-2xl bg-brand-100 text-brand-700 flex items-center justify-center">
             <User className="w-6 h-6" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">Profile</h1>
-            <p className="text-sm text-slate-500">Manage your account, photo, and explore the app.</p>
+            <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Profile</h1>
+            <p className="text-sm text-slate-500 dark:text-slate-400">Manage your account, photo, and explore the app.</p>
           </div>
         </div>
 
@@ -211,7 +197,7 @@ export default function Profile({ user, onUserUpdated }) {
         )}
 
         {/* Avatar */}
-        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm mb-6">
+        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm mb-6 dark:border-slate-700 dark:bg-slate-900">
           <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-500 mb-4 flex items-center gap-2">
             <Camera className="w-4 h-4" /> Photo
           </h2>
@@ -277,25 +263,25 @@ export default function Profile({ user, onUserUpdated }) {
         </section>
 
         {/* Account */}
-        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm mb-6">
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-500 mb-4 flex items-center gap-2">
+        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm mb-6 dark:border-slate-700 dark:bg-slate-900">
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-300 mb-4 flex items-center gap-2">
             <Shield className="w-4 h-4" /> Account details
           </h2>
           <form onSubmit={handleSaveProfile} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1" htmlFor="profile-username">
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1" htmlFor="profile-username">
                 Username
               </label>
               <input
                 id="profile-username"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                className="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-slate-900 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
+                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-slate-900 placeholder:text-slate-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-500"
                 autoComplete="username"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1" htmlFor="profile-email">
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1" htmlFor="profile-email">
                 Email
               </label>
               <input
@@ -303,29 +289,12 @@ export default function Profile({ user, onUserUpdated }) {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-slate-900 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
+                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-slate-900 placeholder:text-slate-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-500"
                 autoComplete="email"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1" htmlFor="profile-preset">
-                Avatar preset (for apps that use it)
-              </label>
-              <select
-                id="profile-preset"
-                value={avatarPreset}
-                onChange={(e) => setAvatarPreset(e.target.value)}
-                className="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-slate-900 bg-white focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
-              >
-                {PRESETS.map((p) => (
-                  <option key={p.value || "none"} value={p.value}>
-                    {p.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1" htmlFor="profile-current-password">
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1" htmlFor="profile-current-password">
                 Current password
               </label>
               <input
@@ -334,7 +303,7 @@ export default function Profile({ user, onUserUpdated }) {
                 value={currentPassword}
                 onChange={(e) => setCurrentPassword(e.target.value)}
                 placeholder="Required only when changing username or email"
-                className="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-slate-900 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
+                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-slate-900 placeholder:text-slate-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-500"
                 autoComplete="current-password"
               />
             </div>
@@ -347,24 +316,24 @@ export default function Profile({ user, onUserUpdated }) {
                 {savingProfile ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                 Save changes
               </button>
-              <Link to="/forgot-password" className="text-sm font-medium text-brand-600 hover:text-brand-700">
+              <Link to="/forgot-password" className="text-sm font-medium text-brand-600 hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300">
                 Forgot password?
               </Link>
             </div>
-            {profileMessage && <p className="text-sm text-emerald-600">{profileMessage}</p>}
-            {profileError && <p className="text-sm text-red-600">{profileError}</p>}
+            {profileMessage && <p className="text-sm text-emerald-600 dark:text-emerald-400">{profileMessage}</p>}
+            {profileError && <p className="text-sm text-red-600 dark:text-red-400">{profileError}</p>}
           </form>
         </section>
 
         {/* Explore & tips */}
-        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm mb-6">
+        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm mb-6 dark:border-slate-700 dark:bg-slate-900">
           <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-500 mb-4 flex items-center gap-2">
             <LayoutGrid className="w-4 h-4" /> Explore Weartual
           </h2>
           <div className="grid gap-3 sm:grid-cols-2 mb-8">
             <Link
               to="/studio"
-              className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm font-semibold text-slate-800 hover:border-brand-300 hover:bg-brand-50/60 transition-colors"
+              className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm font-semibold text-slate-800 hover:border-brand-300 hover:bg-brand-50/60 transition-colors dark:border-slate-600 dark:bg-slate-800/80 dark:text-slate-100 dark:hover:border-brand-500 dark:hover:bg-brand-950/40"
             >
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-brand-100 text-brand-700">
                 <Sparkles className="w-5 h-5" aria-hidden />
@@ -376,7 +345,7 @@ export default function Profile({ user, onUserUpdated }) {
             </Link>
             <Link
               to="/history"
-              className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm font-semibold text-slate-800 hover:border-brand-300 hover:bg-brand-50/60 transition-colors"
+              className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm font-semibold text-slate-800 hover:border-brand-300 hover:bg-brand-50/60 transition-colors dark:border-slate-600 dark:bg-slate-800/80 dark:text-slate-100 dark:hover:border-brand-500 dark:hover:bg-brand-950/40"
             >
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-indigo-100 text-indigo-700">
                 <History className="w-5 h-5" aria-hidden />
@@ -388,7 +357,7 @@ export default function Profile({ user, onUserUpdated }) {
             </Link>
             <Link
               to="/contact"
-              className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm font-semibold text-slate-800 hover:border-brand-300 hover:bg-brand-50/60 transition-colors"
+              className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm font-semibold text-slate-800 hover:border-brand-300 hover:bg-brand-50/60 transition-colors dark:border-slate-600 dark:bg-slate-800/80 dark:text-slate-100 dark:hover:border-brand-500 dark:hover:bg-brand-950/40"
             >
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700">
                 <Mail className="w-5 h-5" aria-hidden />
@@ -400,7 +369,7 @@ export default function Profile({ user, onUserUpdated }) {
             </Link>
             <Link
               to="/about"
-              className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm font-semibold text-slate-800 hover:border-brand-300 hover:bg-brand-50/60 transition-colors"
+              className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm font-semibold text-slate-800 hover:border-brand-300 hover:bg-brand-50/60 transition-colors dark:border-slate-600 dark:bg-slate-800/80 dark:text-slate-100 dark:hover:border-brand-500 dark:hover:bg-brand-950/40"
             >
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-800">
                 <Info className="w-5 h-5" aria-hidden />

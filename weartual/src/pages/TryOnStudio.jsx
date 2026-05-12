@@ -741,7 +741,7 @@ export default function TryOnStudio({ user }) {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900">
+    <div className="min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
       <div className="max-w-6xl mx-auto px-4 py-12">
         <div
           className="text-center mb-6 animate-fade-in-up relative isolate overflow-hidden rounded-3xl border border-white/10 bg-[#050814] min-h-[300px] sm:min-h-[340px] flex items-center justify-center px-5 sm:px-6"
@@ -853,10 +853,10 @@ export default function TryOnStudio({ user }) {
             { key: "person", title: "Person Input (Image/Video)", preview: personPreview, ref: personInputRef, samples: personSamples },
             { key: "garment", title: "Garment Image", preview: garmentPreview, ref: garmentInputRef, samples: clothSamples }
           ].map((block) => (
-            <div key={block.key} className="rounded-2xl border border-slate-200 bg-white p-4">
+            <div key={block.key} className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
               <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-500 mb-3">{block.title}</h3>
               <div
-                className="relative rounded-2xl border border-slate-200 bg-slate-50 min-h-[170px] sm:min-h-[190px] overflow-hidden"
+                className="relative rounded-2xl border border-slate-200 bg-slate-50 dark:border-slate-600 dark:bg-slate-800/50 min-h-[170px] sm:min-h-[190px] overflow-hidden"
                 onClick={() => !block.preview && block.ref.current?.click()}
               >
                 <input
@@ -926,7 +926,7 @@ export default function TryOnStudio({ user }) {
         {showOutputSection && (
           <div className="mx-auto mt-10 w-full max-w-5xl">
             <div
-              className={`rounded-3xl border border-slate-200 bg-white p-3 flex flex-col ${
+              className={`rounded-3xl border border-slate-200 bg-white p-3 flex flex-col dark:border-slate-700 dark:bg-slate-900 ${
                 status === "success" && resultImage ? "h-auto" : "min-h-[360px] sm:min-h-[420px]"
               }`}
             >
@@ -1011,7 +1011,7 @@ export default function TryOnStudio({ user }) {
                 <p className="px-1 pb-2 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-2">{resultVideoError}</p>
               )}
               <div
-                className={`rounded-2xl bg-slate-100 overflow-hidden ${
+                className={`rounded-2xl bg-slate-100 overflow-hidden dark:bg-slate-800/80 ${
                   isProcessing ? "min-h-[320px]" : status === "success" && resultImage ? "" : "min-h-[260px]"
                 }`}
               >
@@ -1174,7 +1174,7 @@ export default function TryOnStudio({ user }) {
                         type="button"
                         onClick={() => handleSuggestionClick(item)}
                         disabled={isProcessing}
-                        className="rounded-xl border border-slate-200 bg-white overflow-hidden transition-all hover:-translate-y-0.5 hover:shadow-md disabled:opacity-60"
+                        className="rounded-xl border border-slate-200 bg-white overflow-hidden transition-all hover:-translate-y-0.5 hover:shadow-md disabled:opacity-60 dark:border-slate-600 dark:bg-slate-800"
                       >
                         <div className="aspect-square bg-slate-100">
                           <img src={item.url} alt={item.name || "Suggested cloth"} className="w-full h-full object-cover" loading="lazy" />

@@ -61,10 +61,10 @@ export default function Contact() {
   };
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-14 sm:px-6 lg:px-8">
+    <div className="max-w-5xl mx-auto px-4 py-14 sm:px-6 lg:px-8 text-slate-900 dark:text-slate-100">
       <div className="text-center mb-12">
-        <h1 className="text-4xl font-bold text-slate-900 mb-4">Contact</h1>
-        <p className="text-lg text-slate-600 max-w-2xl mx-auto">
+        <h1 className="text-4xl font-bold text-slate-900 dark:text-slate-100 mb-4">Contact</h1>
+        <p className="text-lg text-slate-600 max-w-2xl mx-auto leading-relaxed dark:text-slate-400">
           Have questions about the Virtual Try-On system? Reach out to our team.
         </p>
       </div>
@@ -75,34 +75,36 @@ export default function Contact() {
             key={m.name}
             type="button"
             onClick={() => setActiveMember((prev) => (prev === idx ? -1 : idx))}
-            className={`bg-white rounded-2xl p-6 shadow-sm border text-center transition-all duration-200 ${
-              activeMember === idx ? "border-indigo-400 ring-2 ring-indigo-100" : "border-slate-200 hover:border-indigo-300"
+            className={`rounded-2xl p-6 shadow-sm border text-center transition-all duration-200 bg-slate-900 ${
+              activeMember === idx
+                ? "border-indigo-400 ring-2 ring-indigo-500/30"
+                : "border-slate-700 hover:border-indigo-500/50"
             }`}
           >
             <img
               src={m.photo}
               alt={m.name}
-              className="mx-auto mb-4 h-20 w-20 rounded-full object-cover ring-2 ring-indigo-100"
+              className="mx-auto mb-4 h-20 w-20 rounded-full object-cover ring-2 ring-indigo-500/40"
             />
-            <div className="text-lg font-semibold text-slate-900">{m.name}</div>
-            <div className="text-sm font-medium text-indigo-600 mb-3">{m.role}</div>
-            <div className="text-xs text-slate-500 mb-4">{activeMember === idx ? "Click to collapse" : "Click to view details"}</div>
+            <div className="text-lg font-semibold text-slate-100">{m.name}</div>
+            <div className="text-sm font-medium text-indigo-300 mb-3">{m.role}</div>
+            <div className="text-xs text-slate-400 mb-4">{activeMember === idx ? "Click to collapse" : "Click to view details"}</div>
 
             {activeMember === idx && (
-              <p className="text-sm text-slate-600 leading-relaxed mb-5 text-left bg-slate-50 border border-slate-200 rounded-xl p-3">
+              <p className="text-sm text-slate-300 leading-relaxed mb-5 text-left bg-slate-800/80 border border-slate-600 rounded-xl p-3">
                 {m.details}
               </p>
             )}
 
             <div className="space-y-3 text-sm">
               <a
-                className="block text-slate-600 hover:text-indigo-600 transition-colors"
+                className="block text-slate-300 hover:text-indigo-300 transition-colors"
                 href={`mailto:${m.email}`}
               >
                 {m.email}
               </a>
               <a
-                className="block text-slate-600 hover:text-indigo-600 transition-colors"
+                className="block text-slate-300 hover:text-indigo-300 transition-colors"
                 href={`tel:${m.phone}`}
               >
                 {m.phone}
@@ -112,10 +114,10 @@ export default function Contact() {
         ))}
       </div>
 
-      <div className="mt-12 bg-white rounded-2xl p-6 sm:p-8 shadow-sm border border-slate-200">
+      <div className="mt-12 rounded-2xl p-6 sm:p-8 shadow-sm border border-slate-700 bg-slate-900">
         <div className="mb-6">
-          <h2 className="text-2xl font-bold text-slate-900 mb-2">Share Your Feedback</h2>
-          <p className="text-slate-600">
+          <h2 className="text-2xl font-bold text-slate-100 mb-2">Share Your Feedback</h2>
+          <p className="text-lg text-slate-300 leading-relaxed">
             Your suggestions help us improve eastern-wear virtual try-on quality, fitting realism, and overall user
             experience. Tell us what worked well and what we should improve next.
           </p>
@@ -124,7 +126,7 @@ export default function Contact() {
         <form className="space-y-4" onSubmit={handleSubmit}>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1" htmlFor="name">
+              <label className="block text-sm font-medium text-slate-300 mb-1" htmlFor="name">
                 Name
               </label>
               <input
@@ -133,11 +135,11 @@ export default function Contact() {
                 type="text"
                 required
                 placeholder="Enter your full name"
-                className="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-slate-800 outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400"
+                className="w-full rounded-xl border border-slate-600 bg-slate-800/80 px-4 py-2.5 text-slate-100 placeholder:text-slate-500 outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-400"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1" htmlFor="email">
+              <label className="block text-sm font-medium text-slate-300 mb-1" htmlFor="email">
                 Email
               </label>
               <input
@@ -146,13 +148,13 @@ export default function Contact() {
                 type="email"
                 required
                 placeholder="you@example.com"
-                className="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-slate-800 outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400"
+                className="w-full rounded-xl border border-slate-600 bg-slate-800/80 px-4 py-2.5 text-slate-100 placeholder:text-slate-500 outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-400"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1" htmlFor="subject">
+            <label className="block text-sm font-medium text-slate-300 mb-1" htmlFor="subject">
               Subject
             </label>
             <input
@@ -161,12 +163,12 @@ export default function Contact() {
               type="text"
               required
               placeholder="Ex: Fit quality for long kurtas"
-              className="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-slate-800 outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400"
+              className="w-full rounded-xl border border-slate-600 bg-slate-800/80 px-4 py-2.5 text-slate-100 placeholder:text-slate-500 outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-400"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1" htmlFor="message">
+            <label className="block text-sm font-medium text-slate-300 mb-1" htmlFor="message">
               Feedback Message
             </label>
             <textarea
@@ -175,7 +177,7 @@ export default function Contact() {
               required
               rows={5}
               placeholder="Share your feedback, bug report, or feature request..."
-              className="w-full rounded-xl border border-slate-300 px-4 py-3 text-slate-800 outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400"
+              className="w-full rounded-xl border border-slate-600 bg-slate-800/80 px-4 py-3 text-slate-100 placeholder:text-slate-500 outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-400"
             />
           </div>
 
@@ -188,13 +190,13 @@ export default function Contact() {
           </button>
 
           {formError && (
-            <p className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-xl px-4 py-3">
+            <p className="text-sm text-red-200 bg-red-950/50 border border-red-800/80 rounded-xl px-4 py-3">
               {formError}
             </p>
           )}
 
           {feedbackSent && (
-            <p className="text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3">
+            <p className="text-sm text-emerald-200 bg-emerald-950/40 border border-emerald-800/60 rounded-xl px-4 py-3">
               Feedback submitted successfully
             </p>
           )}
@@ -202,16 +204,16 @@ export default function Contact() {
       </div>
 
       <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
-          <h3 className="text-lg font-semibold text-slate-900 mb-2">Expected Response Time</h3>
-          <p className="text-slate-600 text-sm leading-relaxed">
+        <div className="rounded-2xl p-6 shadow-sm border border-slate-700 bg-slate-900">
+          <h3 className="text-lg font-semibold text-slate-100 mb-2">Expected Response Time</h3>
+          <p className="text-slate-300 text-sm leading-relaxed">
             We usually review feedback within 24 to 48 hours. Priority is given to reproducible issues affecting
             eastern-wear fitting realism, garment alignment, and texture consistency.
           </p>
         </div>
-        <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
-          <h3 className="text-lg font-semibold text-slate-900 mb-2">Feedback That Helps Most</h3>
-          <ul className="text-slate-600 text-sm leading-relaxed space-y-1 list-disc list-inside">
+        <div className="rounded-2xl p-6 shadow-sm border border-slate-700 bg-slate-900">
+          <h3 className="text-lg font-semibold text-slate-100 mb-2">Feedback That Helps Most</h3>
+          <ul className="text-slate-300 text-sm leading-relaxed space-y-1 list-disc list-inside">
             <li>Outfit category (kurta, festive top, layered look)</li>
             <li>What looked off (sleeves, hemline, drape, embroidery)</li>
             <li>Whether issue is repeated across multiple uploads</li>

@@ -79,13 +79,13 @@ export default function AboutUs() {
   ];
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-14 sm:px-6 lg:px-8">
+    <div className="max-w-6xl mx-auto px-4 py-14 sm:px-6 lg:px-8 text-slate-900 dark:text-slate-100">
       <div className="text-center mb-12">
-        <div className="inline-flex items-center px-4 py-1.5 rounded-full border border-indigo-200 bg-indigo-50 text-indigo-700 text-xs font-semibold tracking-widest uppercase mb-5">
+        <div className="inline-flex items-center px-4 py-1.5 rounded-full border border-indigo-200 bg-indigo-50 text-indigo-700 text-xs font-semibold tracking-widest uppercase mb-5 dark:border-indigo-500/35 dark:bg-indigo-950/60 dark:text-indigo-200">
           Weartual Research Track
         </div>
-        <h1 className="text-4xl md:text-5xl font-bold text-slate-900 mb-4">About Our Eastern-Wear Virtual Try-On System</h1>
-        <p className="text-lg text-slate-600 max-w-3xl mx-auto leading-relaxed">
+        <h1 className="text-4xl md:text-5xl font-bold text-slate-900 dark:text-slate-100 mb-4">About Our Eastern-Wear Virtual Try-On System</h1>
+        <p className="text-lg text-slate-600 max-w-3xl mx-auto leading-relaxed dark:text-slate-400">
           We are building a virtual try-on platform focused on eastern wear, where graceful drape, intricate detailing,
           and culturally specific silhouettes matter as much as fit. Our work combines robust input handling, dataset-aware
           asset mapping, and StableVITON-ready bundling to deliver realistic previews users can trust.
@@ -93,26 +93,26 @@ export default function AboutUs() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-12">
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <p className="text-3xl font-bold text-slate-900">01</p>
-          <p className="mt-2 text-sm font-semibold uppercase tracking-wide text-slate-500">Core domain</p>
-          <p className="mt-3 text-slate-700">Eastern wear: kurtas, festive tops, embroidered garments, and layered silhouettes.</p>
+        <div className="rounded-2xl border border-slate-700 bg-slate-900 p-6 shadow-sm">
+          <p className="text-3xl font-bold text-slate-100">01</p>
+          <p className="mt-2 text-sm font-semibold uppercase tracking-wide text-slate-400">Core domain</p>
+          <p className="mt-3 text-slate-300 leading-relaxed">Eastern wear: kurtas, festive tops, embroidered garments, and layered silhouettes.</p>
         </div>
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <p className="text-3xl font-bold text-slate-900">02</p>
-          <p className="mt-2 text-sm font-semibold uppercase tracking-wide text-slate-500">Technical focus</p>
-          <p className="mt-3 text-slate-700">StableVITON-compatible multimodal bundle generation with deterministic file mapping.</p>
+        <div className="rounded-2xl border border-slate-700 bg-slate-900 p-6 shadow-sm">
+          <p className="text-3xl font-bold text-slate-100">02</p>
+          <p className="mt-2 text-sm font-semibold uppercase tracking-wide text-slate-400">Technical focus</p>
+          <p className="mt-3 text-slate-300 leading-relaxed">StableVITON-compatible multimodal bundle generation with deterministic file mapping.</p>
         </div>
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <p className="text-3xl font-bold text-slate-900">03</p>
-          <p className="mt-2 text-sm font-semibold uppercase tracking-wide text-slate-500">Product goal</p>
-          <p className="mt-3 text-slate-700">Reduce uncertainty in online purchase decisions with reliable visual fit previews.</p>
+        <div className="rounded-2xl border border-slate-700 bg-slate-900 p-6 shadow-sm">
+          <p className="text-3xl font-bold text-slate-100">03</p>
+          <p className="mt-2 text-sm font-semibold uppercase tracking-wide text-slate-400">Product goal</p>
+          <p className="mt-3 text-slate-300 leading-relaxed">Reduce uncertainty in online purchase decisions with reliable visual fit previews.</p>
         </div>
       </div>
 
       <section className="mb-14">
-        <h2 className="text-2xl font-bold text-slate-900 mb-2">Interactive System Walkthrough</h2>
-        <p className="text-slate-600 mb-6">Select a stage to explore how our pipeline works in production.</p>
+        <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-2">Interactive System Walkthrough</h2>
+        <p className="text-lg text-slate-600 max-w-3xl leading-relaxed dark:text-slate-400 mb-6">Select a stage to explore how our pipeline works in production.</p>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           {pipelineStages.map((stage, idx) => (
             <button
@@ -120,30 +120,30 @@ export default function AboutUs() {
               onClick={() => setActiveStage(idx)}
               className={`text-left rounded-2xl border p-5 transition-all ${
                 activeStage === idx
-                  ? "border-indigo-500 bg-indigo-50 shadow-sm"
-                  : "border-slate-200 bg-white hover:border-indigo-300 hover:bg-slate-50"
+                  ? "border-indigo-400 bg-indigo-950/60 shadow-sm ring-1 ring-indigo-400/40"
+                  : "border-slate-700 bg-slate-900 hover:border-indigo-500/50 hover:bg-slate-800/90"
               }`}
             >
-              <p className="text-xs font-bold tracking-widest uppercase text-slate-500 mb-2">Stage {idx + 1}</p>
-              <h3 className="text-lg font-semibold text-slate-900 mb-2">{stage.title}</h3>
-              <p className="text-sm text-slate-600">{stage.short}</p>
+              <p className="text-xs font-bold tracking-widest uppercase text-slate-400 mb-2">Stage {idx + 1}</p>
+              <h3 className="text-lg font-semibold text-slate-100 mb-2">{stage.title}</h3>
+              <p className="text-sm text-slate-300 leading-relaxed">{stage.short}</p>
             </button>
           ))}
         </div>
-        <div className="mt-5 rounded-2xl border border-indigo-200 bg-white p-6">
-          <h3 className="text-xl font-semibold text-slate-900 mb-3">{pipelineStages[activeStage].title}</h3>
-          <p className="text-slate-700 leading-relaxed">{pipelineStages[activeStage].detail}</p>
+        <div className="mt-5 rounded-2xl border border-slate-700 bg-slate-900 p-6">
+          <h3 className="text-xl font-semibold text-slate-100 mb-3">{pipelineStages[activeStage].title}</h3>
+          <p className="text-slate-300 leading-relaxed">{pipelineStages[activeStage].detail}</p>
         </div>
       </section>
 
       <section className="mb-14">
-        <h2 className="text-2xl font-bold text-slate-900 mb-2">What Makes Eastern Wear Harder</h2>
-        <p className="text-slate-600 mb-5">Switch between focus areas to see where our team is investing effort.</p>
+        <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-2">What Makes Eastern Wear Harder</h2>
+        <p className="text-lg text-slate-600 max-w-3xl leading-relaxed dark:text-slate-400 mb-5">Switch between focus areas to see where our team is investing effort.</p>
         <div className="flex flex-wrap gap-3 mb-5">
           <button
             onClick={() => setActiveChallenge("drape")}
             className={`px-4 py-2 rounded-full text-sm font-semibold transition ${
-              activeChallenge === "drape" ? "bg-slate-900 text-white" : "bg-white border border-slate-200 text-slate-700 hover:bg-slate-50"
+              activeChallenge === "drape" ? "bg-indigo-500 text-white shadow-md" : "bg-slate-900 border border-slate-600 text-slate-200 hover:border-indigo-400/50 hover:bg-slate-800"
             }`}
           >
             Fabric Drape
@@ -152,8 +152,8 @@ export default function AboutUs() {
             onClick={() => setActiveChallenge("embroidery")}
             className={`px-4 py-2 rounded-full text-sm font-semibold transition ${
               activeChallenge === "embroidery"
-                ? "bg-slate-900 text-white"
-                : "bg-white border border-slate-200 text-slate-700 hover:bg-slate-50"
+                ? "bg-indigo-500 text-white shadow-md"
+                : "bg-slate-900 border border-slate-600 text-slate-200 hover:border-indigo-400/50 hover:bg-slate-800"
             }`}
           >
             Embroidery
@@ -161,17 +161,17 @@ export default function AboutUs() {
           <button
             onClick={() => setActiveChallenge("fit")}
             className={`px-4 py-2 rounded-full text-sm font-semibold transition ${
-              activeChallenge === "fit" ? "bg-slate-900 text-white" : "bg-white border border-slate-200 text-slate-700 hover:bg-slate-50"
+              activeChallenge === "fit" ? "bg-indigo-500 text-white shadow-md" : "bg-slate-900 border border-slate-600 text-slate-200 hover:border-indigo-400/50 hover:bg-slate-800"
             }`}
           >
             Regional Fit
           </button>
         </div>
-        <div className="rounded-2xl border border-slate-200 bg-white p-6">
-          <h3 className="text-xl font-semibold text-slate-900 mb-4">{challengeFocus[activeChallenge].title}</h3>
+        <div className="rounded-2xl border border-slate-700 bg-slate-900 p-6">
+          <h3 className="text-xl font-semibold text-slate-100 mb-4">{challengeFocus[activeChallenge].title}</h3>
           <div className="space-y-3">
             {challengeFocus[activeChallenge].points.map((point) => (
-              <p key={point} className="text-slate-700 leading-relaxed">
+              <p key={point} className="text-slate-300 leading-relaxed">
                 {point}
               </p>
             ))}
@@ -180,18 +180,18 @@ export default function AboutUs() {
       </section>
 
       <section>
-        <h2 className="text-2xl font-bold text-slate-900 mb-4">Frequently Asked Questions</h2>
+        <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-4">Frequently Asked Questions</h2>
         <div className="space-y-3">
           {faqs.map((item, idx) => (
-            <div key={item.q} className="rounded-2xl border border-slate-200 bg-white">
+            <div key={item.q} className="rounded-2xl border border-slate-700 bg-slate-900 overflow-hidden">
               <button
                 onClick={() => setOpenFaq(openFaq === idx ? -1 : idx)}
-                className="w-full text-left px-5 py-4 flex items-center justify-between"
+                className="w-full text-left px-5 py-4 flex items-center justify-between hover:bg-slate-800/80 transition-colors"
               >
-                <span className="font-semibold text-slate-900">{item.q}</span>
-                <span className="text-slate-500">{openFaq === idx ? "−" : "+"}</span>
+                <span className="font-semibold text-slate-100">{item.q}</span>
+                <span className="text-slate-400">{openFaq === idx ? "−" : "+"}</span>
               </button>
-              {openFaq === idx && <p className="px-5 pb-5 text-slate-700 leading-relaxed">{item.a}</p>}
+              {openFaq === idx && <p className="px-5 pb-5 text-slate-300 leading-relaxed">{item.a}</p>}
             </div>
           ))}
         </div>

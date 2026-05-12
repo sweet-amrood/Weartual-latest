@@ -44,8 +44,7 @@ function BeforeAfterInteractive({ beforeImage, afterImage, step = 0.1, value = 5
   }, []);
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <div ref={wrapperRef} className={`relative overflow-hidden rounded-xl bg-slate-100 ${aspectClass}`}>
+    <div ref={wrapperRef} className={`relative overflow-hidden rounded-2xl bg-slate-100 shadow-lg dark:bg-slate-900 dark:shadow-black/30 ${aspectClass}`}>
         <img className="absolute inset-0 w-full h-full object-cover" src={beforeImage} alt="Before image" />
         <div className="absolute inset-y-0 left-0 overflow-hidden" style={{ width: `${compareWidth}%` }}>
           <img className="h-full max-w-none object-cover" src={afterImage} alt="After image" style={{ width: `${imageWidth}px` }} />
@@ -75,16 +74,15 @@ function BeforeAfterInteractive({ beforeImage, afterImage, step = 0.1, value = 5
         <div className="absolute top-3 right-3 text-[10px] font-semibold uppercase tracking-wider px-2 py-1 rounded-full bg-brand-600/90 text-white">
           After
         </div>
-      </div>
     </div>
   );
 }
 
 export default function LandingPage() {
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900">
+    <div className="min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
       <section className="relative overflow-hidden pt-20 pb-24">
-        <div className="absolute inset-0 bg-gradient-to-b from-brand-50 via-white to-slate-50" />
+        <div className="absolute inset-0 bg-gradient-to-b from-brand-50 via-white to-slate-50 dark:from-slate-900 dark:via-slate-950 dark:to-slate-950" />
         <div className="absolute -top-24 -left-20 h-72 w-72 rounded-full bg-brand-200/50 blur-3xl" />
         <div className="absolute -bottom-20 -right-16 h-72 w-72 rounded-full bg-indigo-200/50 blur-3xl" />
 
@@ -100,7 +98,7 @@ export default function LandingPage() {
                 Virtually
               </span>
             </h1>
-            <p className="text-lg md:text-xl text-slate-600 mb-10">
+            <p className="text-lg md:text-xl text-slate-600 max-w-3xl mx-auto leading-relaxed dark:text-slate-400 mb-10">
               Upload your photo, pick any outfit, and generate realistic try-on previews in seconds.
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
@@ -112,7 +110,7 @@ export default function LandingPage() {
               </Link>
               <Link
                 to="/about"
-                className="w-full sm:w-auto inline-flex items-center justify-center px-8 py-4 rounded-xl bg-white border border-slate-200 text-slate-800 font-semibold hover:bg-slate-50"
+                className="w-full sm:w-auto inline-flex items-center justify-center px-8 py-4 rounded-xl bg-white border border-slate-200 text-slate-800 font-semibold hover:bg-slate-50 dark:bg-slate-800 dark:border-slate-600 dark:text-slate-100 dark:hover:bg-slate-700"
               >
                 Learn More
               </Link>
@@ -135,11 +133,11 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <section className="py-20 bg-white">
+      <section className="py-20 bg-slate-50 dark:bg-slate-950">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold mb-3">How It Works</h2>
-            <p className="text-slate-600">Three quick steps from upload to realistic fit preview.</p>
+            <h2 className="text-3xl font-bold mb-3 text-slate-900 dark:text-slate-100">How It Works</h2>
+            <p className="text-lg text-slate-600 max-w-3xl mx-auto leading-relaxed dark:text-slate-400">Three quick steps from upload to realistic fit preview.</p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {[
@@ -147,24 +145,24 @@ export default function LandingPage() {
               { icon: Shirt, title: "Choose Garment", desc: "Pick from samples or upload your own." },
               { icon: Sparkles, title: "Generate Result", desc: "AI renders your styled output in seconds." }
             ].map((item) => (
-              <div key={item.title} className="rounded-2xl border border-slate-200 bg-slate-50 p-6 text-center hover:shadow-md transition-shadow">
-                <div className="w-14 h-14 rounded-2xl bg-brand-100 text-brand-700 mx-auto mb-4 flex items-center justify-center">
+              <div key={item.title} className="rounded-2xl border border-slate-700 bg-slate-900 p-6 text-center shadow-md transition-shadow dark:border-slate-600 dark:bg-slate-900">
+                <div className="w-14 h-14 rounded-2xl bg-indigo-500/25 text-indigo-100 ring-1 ring-indigo-400/30 mx-auto mb-4 flex items-center justify-center dark:bg-indigo-500/20 dark:text-indigo-100 dark:ring-indigo-400/40">
                   <item.icon className="w-7 h-7" />
                 </div>
-                <h3 className="text-lg font-semibold mb-2">{item.title}</h3>
-                <p className="text-slate-600 text-sm">{item.desc}</p>
+                <h3 className="text-lg font-semibold mb-2 text-slate-100">{item.title}</h3>
+                <p className="text-slate-300 text-sm leading-relaxed">{item.desc}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      <section className="py-20 bg-slate-50">
+      <section className="py-20 bg-slate-50 dark:bg-slate-950">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
             <div>
-              <h2 className="text-3xl font-bold mb-4">Built for realistic styling output</h2>
-              <p className="text-slate-600 mb-8">
+              <h2 className="text-3xl font-bold mb-4 dark:text-slate-100">Built for realistic styling output</h2>
+              <p className="text-slate-600 dark:text-slate-400 mb-8">
                 The Weartual engine preserves identity, pose, and visual details while adapting garments naturally.
               </p>
               <div className="space-y-5">
@@ -174,18 +172,18 @@ export default function LandingPage() {
                   { icon: Download, label: "Export ready", text: "Download generated outputs directly." }
                 ].map((feature) => (
                   <div key={feature.label} className="flex gap-3">
-                    <div className="w-11 h-11 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-brand-600">
+                    <div className="w-11 h-11 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-brand-600 dark:bg-slate-800 dark:border-slate-600">
                       <feature.icon className="w-5 h-5" />
                     </div>
                     <div>
                       <h4 className="font-semibold">{feature.label}</h4>
-                      <p className="text-sm text-slate-600">{feature.text}</p>
+                      <p className="text-sm text-slate-600 dark:text-slate-400">{feature.text}</p>
                     </div>
                   </div>
                 ))}
               </div>
             </div>
-            <div className="rounded-3xl overflow-hidden border border-slate-200 shadow-xl">
+            <div className="rounded-3xl overflow-hidden border border-slate-200 shadow-xl dark:border-slate-700">
               <img
                 src="https://images.unsplash.com/photo-1483985988355-763728e1935b?auto=format&fit=crop&w=900&q=80"
                 alt="Fashion preview"

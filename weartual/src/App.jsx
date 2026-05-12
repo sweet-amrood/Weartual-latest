@@ -62,7 +62,7 @@ export default function App() {
           path="/profile"
           element={
             authLoading ? (
-              <div className="min-h-[60vh] flex items-center justify-center text-slate-600">
+              <div className="min-h-[60vh] flex items-center justify-center text-slate-600 dark:text-slate-400">
                 Loading...
               </div>
             ) : user ? (
@@ -78,7 +78,7 @@ export default function App() {
           path="/login"
           element={
             authLoading ? (
-              <div className="min-h-[60vh] flex items-center justify-center text-slate-600">
+              <div className="min-h-[60vh] flex items-center justify-center text-slate-600 dark:text-slate-400">
                 Loading...
               </div>
             ) : user ? (
@@ -92,7 +92,7 @@ export default function App() {
           path="/signup"
           element={
             authLoading ? (
-              <div className="min-h-[60vh] flex items-center justify-center text-slate-600">
+              <div className="min-h-[60vh] flex items-center justify-center text-slate-600 dark:text-slate-400">
                 Loading...
               </div>
             ) : user ? (
