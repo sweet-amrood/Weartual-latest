@@ -42,6 +42,12 @@ export const forgotPassword = (payload) =>
     body: JSON.stringify(payload)
   });
 
+export const resetPassword = ({ token, password }) =>
+  request(`/api/auth/reset-password/${encodeURIComponent(token)}`, {
+    method: "POST",
+    body: JSON.stringify({ password })
+  });
+
 export const getMe = () => request("/api/auth/me", { method: "GET" });
 
 export const logout = () =>

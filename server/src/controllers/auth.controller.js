@@ -9,35 +9,21 @@ import {
 } from "../services/auth.service.js";
 import { cookieOptions } from "../utils/token.js";
 import { dispatchEmailSafely } from "../utils/dispatchEmail.js";
-
-const buildWelcomeEmailHtml = (username) => `
-    <div style="font-family: Arial, sans-serif; line-height: 1.6;">
-      <h2>Welcome to Weartual</h2>
-      <p>Hi ${username},</p>
-      <p>Your account has been created successfully. We are excited to have you with us.</p>
-      <p>Start exploring Weartual and enjoy your experience.</p>
-    </div>
-  `;
-
-const buildLoginAlertEmailHtml = (username) => {
-  const loginTime = new Date().toISOString();
-  return `
-    <div style="font-family: Arial, sans-serif; line-height: 1.6;">
-      <h2>New login detected</h2>
-      <p>Hi ${username},</p>
-      <p>You just logged into your account.</p>
-      <p><strong>Time:</strong> ${loginTime}</p>
-    </div>
-  `;
-};
+import {
+  buildLoginAlertEmailGoogle,
+  buildLoginAlertEmailWeb,
+  buildWelcomeEmailGoogle,
+  buildWelcomeEmailWeb
+} from "../utils/emailTemplates.js";
 
 export const signup = asyncHandler(async (req, res) => {
   const { token, user } = await signupService(req.body);
 
+  const { subject, html } = buildWelcomeEmailWeb(user.username);
   await dispatchEmailSafely({
     to: user.email,
-    subject: "Welcome to Weartual",
-    html: buildWelcomeEmailHtml(user.username),
+    subject,
+    html,
     context: "auth-signup"
   });
 
@@ -53,11 +39,13 @@ export const signup = asyncHandler(async (req, res) => {
 export const login = asyncHandler(async (req, res) => {
   const { token, user } = await loginService(req.body);
 
+  const { subject, html } = buildLoginAlertEmailWeb(user.username, user.email);
+
   await dispatchEmailSafely({
     to: user.email,
-    subject: "New login detected",
-    html: buildLoginAlertEmailHtml(user.username),
-    context: "auth-login"
+    subject,
+    html,
+    context: "auth-login-email"
   });
 
   res.cookie("token", token, cookieOptions);
@@ -74,17 +62,19 @@ export const googleAuth = asyncHandler(async (req, res) => {
   const { token, user, isNewUser } = await googleAuthService({ idToken: incomingToken });
 
   if (isNewUser) {
+    const welcome = buildWelcomeEmailGoogle(user.username);
     await dispatchEmailSafely({
       to: user.email,
-      subject: "Welcome to Weartual",
-      html: buildWelcomeEmailHtml(user.username),
+      subject: welcome.subject,
+      html: welcome.html,
       context: "auth-google-signup"
     });
   } else {
+    const alert = buildLoginAlertEmailGoogle(user.username, user.email);
     await dispatchEmailSafely({
       to: user.email,
-      subject: "New login detected",
-      html: buildLoginAlertEmailHtml(user.username),
+      subject: alert.subject,
+      html: alert.html,
       context: "auth-google-login"
     });
   }

@@ -25,6 +25,10 @@ if (hasRequiredConfig) {
       host: smtpHost,
       port: smtpPort,
       secure: smtpPort === 465,
+      requireTLS: smtpPort === 587,
+      connectionTimeout: 20_000,
+      greetingTimeout: 20_000,
+      socketTimeout: 25_000,
       auth: {
         user: smtpUser,
         pass: smtpPass,
@@ -68,7 +72,7 @@ export const sendEmail = async (to, subject, html) => {
       `[email] Failed to send email. to="${to}", subject="${subject}":`,
       error
     );
-    return null;
+    throw error;
   }
 };
 

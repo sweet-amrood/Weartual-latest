@@ -3,6 +3,8 @@ import { OAuth2Client } from "google-auth-library";
 import User from "../models/User.js";
 import AppError from "../utils/AppError.js";
 import { signJwt } from "../utils/token.js";
+import { dispatchEmailSafely } from "../utils/dispatchEmail.js";
+import { buildPasswordResetEmail } from "../utils/emailTemplates.js";
 
 const sanitizeUser = (user) => ({
   id: user._id,
@@ -144,8 +146,24 @@ export const forgotPasswordService = async (email) => {
   const rawToken = user.createPasswordResetToken();
   await user.save({ validateBeforeSave: false });
 
-  const resetUrl = `${process.env.CLIENT_URL}/reset-password/${rawToken}`;
-  console.log(`[auth][forgot-password] reset URL generated for ${user.email}: ${resetUrl}`);
+  const appOrigin = String(process.env.CLIENT_URL || "")
+    .split(",")
+    .map((s) => s.trim().replace(/\/+$/, ""))
+    .filter(Boolean)[0] || "http://localhost:5173";
+  const resetUrl = `${appOrigin}/reset-password/${rawToken}`;
+
+  if (process.env.NODE_ENV === "development") {
+    console.info(`[auth][forgot-password] reset link generated for ${user.email} (see email or dev log)`);
+  }
+
+  const { subject, html } = buildPasswordResetEmail(resetUrl);
+
+  await dispatchEmailSafely({
+    to: user.email,
+    subject,
+    html,
+    context: "auth-forgot-password"
+  });
 
   return {
     message: "If this email exists, a password reset link has been sent."

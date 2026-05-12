@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import Login from './pages/login'
 import Signup from './pages/signup'
 import ForgetPassword from './pages/forgetpassword'
+import ResetPassword from './pages/ResetPassword'
 import Navbar from './components/Navbar'
 import LandingPage from './pages/LandingPage'
 import TryOnStudio from './pages/TryOnStudio'
@@ -87,6 +88,7 @@ export default function App() {
           }
         />
         <Route path="/forgot-password" element={<ForgetPassword />} />
+        <Route path="/reset-password/:token" element={<ResetPassword />} />
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </Router>

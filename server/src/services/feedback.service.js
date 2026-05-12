@@ -1,6 +1,7 @@
 import AppError from "../utils/AppError.js";
 import Feedback from "../models/Feedback.js";
 import { dispatchEmailSafely } from "../utils/dispatchEmail.js";
+import { buildFeedbackInternalEmail, buildFeedbackUserAckEmail } from "../utils/emailTemplates.js";
 
 const escapeHtml = (value) =>
   String(value)
@@ -47,46 +48,30 @@ export const createFeedbackService = async ({ name, email, message }) => {
     throw error;
   }
 
-  const safeName = escapeHtml(normalizedName);
-  const safeEmail = escapeHtml(normalizedEmail);
   const safeMessage = escapeHtml(normalizedMessage).replace(/\n/g, "<br>");
 
-  const userAckHtml = `
-    <div style="font-family: Arial, sans-serif; line-height: 1.6;">
-      <h2>We received your feedback</h2>
-      <p>Hi ${safeName},</p>
-      <p>Thanks for contacting Weartual. We have received your message and will review it soon.</p>
-    </div>
-  `;
+  const userAck = buildFeedbackUserAckEmail(normalizedName);
 
   const companyTo = companyInboxAddress();
-  const internalHtml = companyTo
-    ? `
-      <div style="font-family: Arial, sans-serif; line-height: 1.6;">
-        <h2>New feedback submission</h2>
-        <p><strong>Name:</strong> ${safeName}</p>
-        <p><strong>Email:</strong> ${safeEmail}</p>
-        <p><strong>Message:</strong></p>
-        <p>${safeMessage}</p>
-      </div>
-    `
-    : "";
+  const internal =
+    companyTo &&
+    buildFeedbackInternalEmail(normalizedName, normalizedEmail, safeMessage);
 
   const emailTasks = [
     dispatchEmailSafely({
       to: normalizedEmail,
-      subject: "We received your feedback — Weartual",
-      html: userAckHtml,
+      subject: userAck.subject,
+      html: userAck.html,
       context: "feedback-user"
     })
   ];
 
-  if (companyTo && internalHtml) {
+  if (companyTo && internal) {
     emailTasks.push(
       dispatchEmailSafely({
         to: companyTo,
-        subject: `[Weartual feedback] from ${normalizedName}`,
-        html: internalHtml,
+        subject: internal.subject,
+        html: internal.html,
         context: "feedback-company"
       })
     );
