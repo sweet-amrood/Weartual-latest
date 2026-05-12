@@ -124,7 +124,27 @@ export default function Navbar({ user, onLogout }) {
 
             {user ? (
               !isAuthRoute && (
-                <div className="hidden md:flex items-center gap-4 border-l border-slate-200 pl-6 ml-2">
+                <div className="hidden md:flex items-center gap-3 border-l border-slate-200 pl-6 ml-2">
+                  <NavLink
+                    to="/profile"
+                    title="Profile"
+                    aria-label="Open profile"
+                    className={({ isActive }) =>
+                      `flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-brand-50 to-indigo-50 transition-shadow outline-none focus-visible:outline-none ${
+                        isActive
+                          ? "ring-2 ring-brand-600 ring-offset-2 ring-offset-white shadow-sm"
+                          : "border-2 border-slate-200 hover:border-brand-400 hover:shadow-sm"
+                      }`
+                    }
+                  >
+                    {user?.avatarUrl ? (
+                      <img src={user.avatarUrl} alt="" className="h-full w-full object-cover" />
+                    ) : (
+                      <span className="text-sm font-bold text-brand-800">
+                        {(user?.username || user?.email || "?").slice(0, 1).toUpperCase()}
+                      </span>
+                    )}
+                  </NavLink>
                   <button
                     type="button"
                     onClick={handleLogout}
@@ -187,6 +207,27 @@ export default function Navbar({ user, onLogout }) {
               >
                 <History className="w-4 h-4" /> Outfit History
               </NavLink>
+              {user ? (
+                <NavLink
+                  to="/profile"
+                  className={({ isActive }) =>
+                    `flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-colors ${
+                      isActive ? "bg-brand-50 text-brand-800" : "text-slate-700 hover:bg-slate-100"
+                    }`
+                  }
+                >
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full border border-slate-200 bg-gradient-to-br from-brand-50 to-indigo-50">
+                    {user.avatarUrl ? (
+                      <img src={user.avatarUrl} alt="" className="h-full w-full object-cover" />
+                    ) : (
+                      <span className="text-xs font-bold text-brand-800">
+                        {(user.username || user.email || "?").slice(0, 1).toUpperCase()}
+                      </span>
+                    )}
+                  </span>
+                  Profile
+                </NavLink>
+              ) : null}
             </div>
 
             <div className="mt-4 border-t border-slate-200 pt-4">

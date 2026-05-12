@@ -10,6 +10,7 @@ import TryOnStudio from './pages/TryOnStudio'
 import AboutUs from './pages/AboutUs'
 import Contact from './pages/Contact'
 import OutfitHistory from './pages/OutfitHistory'
+import Profile from './pages/Profile'
 import { getMe } from './services/authApi'
 
 export default function App() {
@@ -57,6 +58,20 @@ export default function App() {
         <Route path="/" element={<LandingPage />} />
         <Route path="/studio" element={<TryOnStudio user={user} />} />
         <Route path="/history" element={<OutfitHistory user={user} />} />
+        <Route
+          path="/profile"
+          element={
+            authLoading ? (
+              <div className="min-h-[60vh] flex items-center justify-center text-slate-600">
+                Loading...
+              </div>
+            ) : user ? (
+              <Profile user={user} onUserUpdated={setUser} />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
         <Route path="/about" element={<AboutUs />} />
         <Route path="/contact" element={<Contact />} />
         <Route
