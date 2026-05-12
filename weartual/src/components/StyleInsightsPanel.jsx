@@ -175,7 +175,7 @@ export default function StyleInsightsPanel({ personImageUrl, clothImageUrl }) {
 
   const cardClassName = useMemo(
     () =>
-      `rounded-3xl border border-slate-200 bg-white p-4 shadow-xl transition-all duration-500 ${
+      `rounded-3xl border border-slate-200 bg-white p-4 transition-all duration-500 ${
         loading ? "opacity-85" : "opacity-100"
       }`,
     [loading]

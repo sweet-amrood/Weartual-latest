@@ -574,7 +574,7 @@ export default function TryOnStudio({ user }) {
     <div className="min-h-screen bg-slate-50 text-slate-900">
       <div className="max-w-6xl mx-auto px-4 py-12">
         <div
-          className="text-center mb-6 animate-fade-in-up relative isolate overflow-hidden rounded-3xl border border-white/10 bg-[#050814] min-h-[300px] sm:min-h-[340px] flex items-center justify-center px-5 sm:px-6 shadow-[0_0_0_1px_rgba(255,255,255,0.06),0_24px_80px_rgba(15,23,42,0.65)]"
+          className="text-center mb-6 animate-fade-in-up relative isolate overflow-hidden rounded-3xl border border-white/10 bg-[#050814] min-h-[300px] sm:min-h-[340px] flex items-center justify-center px-5 sm:px-6"
           onMouseMove={handleHeroMouseMove}
           onMouseLeave={() => {
             heroTargetRef.current = { x: 50, y: 50 };
@@ -711,7 +711,7 @@ export default function TryOnStudio({ user }) {
 
           <div className="lg:col-span-7 flex flex-col gap-4">
             <div
-              className={`rounded-3xl border border-slate-200 bg-white p-3 shadow-xl flex flex-col ${
+              className={`rounded-3xl border border-slate-200 bg-white p-3 flex flex-col ${
                 status === "success" && resultImage ? "h-auto" : "h-full"
               }`}
             >
