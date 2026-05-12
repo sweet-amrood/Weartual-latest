@@ -5,6 +5,7 @@ import { accessSync, constants } from "fs";
 import { fileURLToPath } from "url";
 import AppError from "../utils/AppError.js";
 import { mergeDecartVendorPythonPath } from "../utils/decartPythonVendorEnv.js";
+import { getDecartApiKeysInRandomOrder, maskDecartApiKey } from "../utils/decartApiKeys.js";
 
 const DEFAULT_TIMEOUT_MS = 15 * 60 * 1000;
 const __filename = fileURLToPath(import.meta.url);
@@ -36,32 +37,24 @@ const resolveScriptPath = (configuredPath, fallbackPath) => {
   return { attempted: candidates };
 };
 
-/**
- * Runs the Decart IRL Python pipeline (irl.py): person video + garment reference image -> output MP4.
- * Requires DECART_IRL_SCRIPT (path to irl.py), DECART_API_KEY, and Python with decart deps on PATH.
- */
-export const runDecartIrlPipeline = ({ videoPath, referenceImagePath, outputPath, timeoutMs = DEFAULT_TIMEOUT_MS }) =>
+const runDecartIrlOnceWithKey = ({
+  scriptPath,
+  pythonBin,
+  videoPath,
+  referenceImagePath,
+  outputPath,
+  timeoutMs,
+  apiKey
+}) =>
   new Promise((resolve, reject) => {
-    const resolved = resolveScriptPath(process.env.DECART_IRL_SCRIPT, DEFAULT_IRL_SCRIPT_PATH);
-
-    if (!(process.env.DECART_API_KEY || "").trim()) {
-      reject(new AppError("DECART_API_KEY is not set (required for person video try-on).", 500));
-      return;
-    }
-
-    if (typeof resolved !== "string") {
-      reject(
-        new AppError(`Decart IRL script cannot be read. Tried: ${resolved.attempted.join(" | ")}`, 500)
-      );
-      return;
-    }
-    const scriptPath = resolved;
-
-    const defaultPy = process.platform === "win32" ? "python" : "python3";
-    const pythonBin = (process.env.DECART_PYTHON || defaultPy).trim() || defaultPy;
     const absVideo = path.resolve(videoPath);
     const absRef = path.resolve(referenceImagePath);
     const absOut = path.resolve(outputPath);
+
+    const env = mergeDecartVendorPythonPath({
+      ...process.env,
+      DECART_API_KEY: apiKey
+    });
 
     let settled = false;
     const finish = (fn) => {
@@ -71,7 +64,7 @@ export const runDecartIrlPipeline = ({ videoPath, referenceImagePath, outputPath
     };
 
     const child = spawn(pythonBin, [scriptPath, absVideo, absRef, absOut], {
-      env: mergeDecartVendorPythonPath(process.env),
+      env,
       stdio: ["ignore", "pipe", "pipe"]
     });
 
@@ -114,3 +107,64 @@ export const runDecartIrlPipeline = ({ videoPath, referenceImagePath, outputPath
       finish(() => resolve({ outputPath: absOut }));
     });
   });
+
+/**
+ * Runs Decart irl.py: person video + garment reference image -> output MP4.
+ * Tries multiple API keys in random order until one succeeds.
+ */
+export const runDecartIrlPipeline = async ({
+  videoPath,
+  referenceImagePath,
+  outputPath,
+  timeoutMs = DEFAULT_TIMEOUT_MS
+}) => {
+  const keys = getDecartApiKeysInRandomOrder();
+  if (!keys.length) {
+    throw new AppError(
+      "No Decart API keys configured. Set DECART_API_KEY and/or DECART_API_KEYS (comma-separated).",
+      500
+    );
+  }
+
+  const resolved = resolveScriptPath(process.env.DECART_IRL_SCRIPT, DEFAULT_IRL_SCRIPT_PATH);
+  if (typeof resolved !== "string") {
+    throw new AppError(`Decart IRL script cannot be read. Tried: ${resolved.attempted.join(" | ")}`, 500);
+  }
+  const scriptPath = resolved;
+
+  const defaultPy = process.platform === "win32" ? "python" : "python3";
+  const pythonBin = (process.env.DECART_PYTHON || defaultPy).trim() || defaultPy;
+  const absOut = path.resolve(outputPath);
+
+  let lastError = null;
+  for (let i = 0; i < keys.length; i += 1) {
+    const apiKey = keys[i];
+    try {
+      await fs.unlink(absOut).catch(() => {});
+      console.info(`[decart-irl] attempt ${i + 1}/${keys.length} key=${maskDecartApiKey(apiKey)}`);
+      const result = await runDecartIrlOnceWithKey({
+        scriptPath,
+        pythonBin,
+        videoPath,
+        referenceImagePath,
+        outputPath,
+        timeoutMs,
+        apiKey
+      });
+      return result;
+    } catch (err) {
+      const msg = err instanceof AppError ? err.message : String(err?.message || err);
+      console.warn(`[decart-irl] key ${maskDecartApiKey(apiKey)} failed: ${msg.slice(0, 400)}`);
+      lastError = err instanceof AppError ? err : new AppError(msg, 502);
+    }
+  }
+
+  const code =
+    lastError instanceof AppError && typeof lastError.statusCode === "number" && lastError.statusCode >= 400
+      ? lastError.statusCode
+      : 502;
+  throw new AppError(
+    `All ${keys.length} Decart API key(s) failed for video try-on. Last error: ${lastError?.message || "unknown"}`,
+    code
+  );
+};

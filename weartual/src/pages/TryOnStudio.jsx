@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useState, useEffect } from "react";
-import { listDatasetSamples, uploadMyImage, getMyLookCount, deleteMyImage, deleteMyImageByResultUrl } from "../services/imageApi";
+import { listDatasetSamples, uploadMyImage, deleteMyImage, deleteMyImageByResultUrl } from "../services/imageApi";
 import { Sparkles, Trash2, Download, Maximize2, X, ArrowRight, ThumbsUp, ThumbsDown, Star, MessageCircle, Music2, Link2, Share2, Send } from "lucide-react";
 import StyleInsightsPanel from "../components/StyleInsightsPanel";
 import {
@@ -18,16 +18,19 @@ const GARMENT_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const PERSON_MAX_BYTES = 100 * 1024 * 1024;
 const GARMENT_MAX_BYTES = 10 * 1024 * 1024;
 const AI_PROGRESS_STAGES = ["Detecting pose...", "Applying cloth...", "Refining output..."];
-const LOCAL_CLOTH_DATASET = [
-  "/dataset/cloth/00001_00.jpg",
-  "/dataset/cloth/00002_00.jpg",
-  "/dataset/cloth/00003_00.jpg",
-  "/dataset/cloth/00004_00.jpg",
-  "/dataset/cloth/00005_00.jpg",
-  "/dataset/cloth/00006_00.jpg",
-  "/dataset/cloth/00007_00.jpg",
-  "/dataset/cloth/00008_00.jpg"
-];
+/** Same files as `public/dataset/cloth/` (used when API has no cloth samples). */
+const LOCAL_CLOTH_DATASET = Array.from({ length: 8 }, (_, i) => `/dataset/cloth/${String(i + 1).padStart(2, "0")}.jpg`);
+
+/** When `/api/images/samples` is empty (no Viton folders on the API host), load thumbnails from `public/dataset/`. */
+const staticUiDatasetSamples = (type) => {
+  if (typeof window === "undefined") return [];
+  const folder = type === "image" ? "image" : "cloth";
+  const origin = window.location.origin;
+  return Array.from({ length: 8 }, (_, i) => {
+    const name = `${String(i + 1).padStart(2, "0")}.jpg`;
+    return { fileName: name, url: `${origin}/dataset/${folder}/${name}` };
+  });
+};
 
 const pickRandomItems = (items, count = 4) => {
   const source = [...items];
@@ -80,7 +83,6 @@ export default function TryOnStudio({ user }) {
   const [shareFeedback, setShareFeedback] = useState("");
   const [resultVideoError, setResultVideoError] = useState("");
   const [isImageFullscreenOpen, setIsImageFullscreenOpen] = useState(false);
-  const [lookCount, setLookCount] = useState(null);
   const [currentJobId, setCurrentJobId] = useState(null);
   const heroTargetRef = useRef({ x: 50, y: 50 });
   const compareRef = useRef(null);
@@ -94,15 +96,19 @@ export default function TryOnStudio({ user }) {
     let cancelled = false;
     const load = async () => {
       try {
-        const [people, cloth] = await Promise.all([listDatasetSamples("image", 0), listDatasetSamples("cloth", 8)]);
+        const [people, cloth] = await Promise.all([listDatasetSamples("image", 0), listDatasetSamples("cloth", 0)]);
+        const pick = (data, t) => {
+          const rows = data?.samples || [];
+          return rows.length > 0 ? rows : staticUiDatasetSamples(t);
+        };
         if (!cancelled) {
-          setPersonSamples(people?.samples || []);
-          setClothSamples(cloth?.samples || []);
+          setPersonSamples(pick(people, "image"));
+          setClothSamples(pick(cloth, "cloth"));
         }
       } catch {
         if (!cancelled) {
-          setPersonSamples([]);
-          setClothSamples([]);
+          setPersonSamples(staticUiDatasetSamples("image"));
+          setClothSamples(staticUiDatasetSamples("cloth"));
         }
       }
     };
@@ -111,24 +117,6 @@ export default function TryOnStudio({ user }) {
       cancelled = true;
     };
   }, []);
-
-  useEffect(() => {
-    if (!user) {
-      setLookCount(null);
-      return undefined;
-    }
-    let cancelled = false;
-    getMyLookCount()
-      .then((data) => {
-        if (!cancelled && typeof data?.lookCount === "number") setLookCount(data.lookCount);
-      })
-      .catch(() => {
-        if (!cancelled) setLookCount(null);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [user]);
 
   useEffect(() => {
     if (typeof window === "undefined" || typeof window.matchMedia !== "function") return;
@@ -216,7 +204,7 @@ export default function TryOnStudio({ user }) {
     resize();
     window.addEventListener("resize", resize);
     return () => window.removeEventListener("resize", resize);
-  }, [status, resultImage, garmentPreview]);
+  }, [status, resultImage, personPreview, personMediaType]);
 
   useEffect(() => {
     if (!resultImage || resultMediaType !== "image") {
@@ -364,15 +352,6 @@ export default function TryOnStudio({ user }) {
         : LOCAL_CLOTH_DATASET.map((url, idx) => ({ url, name: `Cloth ${idx + 1}` }));
       setImprovementSuggestions(pickRandomItems(candidateSuggestions, 4));
       setCurrentJobId(resolvedJobId);
-      if (typeof response?.lookCount === "number") setLookCount(response.lookCount);
-      else {
-        try {
-          const c = await getMyLookCount();
-          if (typeof c?.lookCount === "number") setLookCount(c.lookCount);
-        } catch {
-          /* ignore */
-        }
-      }
     } catch (err) {
       setStatus("error");
       setError(err?.message || "Try-on generation failed.");
@@ -413,13 +392,6 @@ export default function TryOnStudio({ user }) {
       removeOutfitHistoryEntryByJobId(uid, jobId);
       if (resultImage) removeOutfitHistoryEntriesWithImageUrl(uid, String(resultImage).trim());
       if (currentOutfitId) removeOutfitRatingByOutfitId(uid, currentOutfitId);
-      if (typeof data?.lookCount === "number") setLookCount(data.lookCount);
-      try {
-        const fresh = await getMyLookCount();
-        if (typeof fresh?.lookCount === "number") setLookCount(fresh.lookCount);
-      } catch {
-        /* ignore */
-      }
       setCurrentJobId(null);
       setCurrentOutfitId(null);
       setResultImage(null);
@@ -686,11 +658,6 @@ export default function TryOnStudio({ user }) {
               <div className="flex flex-wrap items-center justify-between gap-2 px-1 pb-2">
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                   <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-500">Result Preview</h3>
-                  {getAuthenticatedUserId(user) !== "anonymous" && lookCount !== null && (
-                    <span className="text-xs font-medium text-slate-600 tabular-nums rounded-full border border-slate-200 bg-slate-50 px-2.5 py-0.5">
-                      Your looks: {lookCount}
-                    </span>
-                  )}
                 </div>
                 {status === "success" && resultImage && (
                   <div className="flex flex-wrap items-center justify-end gap-2 w-full sm:w-auto">
@@ -801,13 +768,13 @@ export default function TryOnStudio({ user }) {
                       </p>
                     </div>
                   </div>
-                ) : status === "success" && resultImage && resultMediaType === "image" && garmentPreview ? (
+                ) : status === "success" && resultImage && resultMediaType === "image" && personPreview && personMediaType === "image" ? (
                   <div
                     ref={compareRef}
                     className="relative w-full overflow-hidden bg-black select-none"
                     style={resultAspectRatio ? { aspectRatio: `${resultAspectRatio}` } : undefined}
                   >
-                    <img src={garmentPreview} alt="Cloth preview" className="block w-full h-auto" draggable={false} />
+                    <img src={personPreview} alt="Person before try-on" className="block w-full h-auto" draggable={false} />
                     <div className="absolute inset-y-0 left-0 overflow-hidden" style={{ width: `${comparePosition}%` }}>
                       <img
                         src={resultImage}
@@ -837,10 +804,10 @@ export default function TryOnStudio({ user }) {
                     </div>
 
                     <div className="absolute top-3 left-3 text-[10px] font-semibold uppercase tracking-wider px-2 py-1 rounded-full bg-slate-900/70 text-white">
-                      After
+                      After (try-on)
                     </div>
                     <div className="absolute top-3 right-3 text-[10px] font-semibold uppercase tracking-wider px-2 py-1 rounded-full bg-brand-600/90 text-white">
-                      Before
+                      Before (person)
                     </div>
                   </div>
                 ) : status === "success" && resultImage ? (

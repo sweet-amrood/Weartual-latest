@@ -108,17 +108,25 @@ export default function OutfitHistory({ user }) {
       return undefined;
     }
     let cancelled = false;
+    const seed =
+      typeof user.totalLookCount === "number" && !Number.isNaN(user.totalLookCount)
+        ? user.totalLookCount
+        : null;
+    if (seed !== null) setLookCount(seed);
+
     getMyLookCount()
       .then((data) => {
         if (!cancelled && typeof data?.lookCount === "number") setLookCount(data.lookCount);
       })
       .catch(() => {
-        if (!cancelled) setLookCount(null);
+        if (cancelled) return;
+        if (seed !== null) setLookCount(seed);
+        else setLookCount(null);
       });
     return () => {
       cancelled = true;
     };
-  }, [user]);
+  }, [user, user?.totalLookCount]);
 
   useEffect(() => {
     if (!fullscreenEntry) return undefined;

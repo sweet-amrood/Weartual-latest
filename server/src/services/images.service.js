@@ -28,8 +28,11 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const RESULT_DIR = path.resolve(__dirname, "../../result");
 const UPLOADS_DIR = path.resolve(__dirname, "../../uploads");
+/** Default UI samples: `weartual/public/dataset/{image,cloth}/` (works when Viton folders are absent / gitignored). */
+const BUNDLED_UI_DATASET_ROOT = path.resolve(__dirname, "../../../weartual/public/dataset");
 const DATASET_ROOT_CANDIDATES = [
   process.env.STABLE_VITON_DATASET_DIR ? path.resolve(__dirname, process.env.STABLE_VITON_DATASET_DIR) : null,
+  BUNDLED_UI_DATASET_ROOT,
   path.resolve(__dirname, "../../dataset small"),
   path.resolve(__dirname, "../../dataset")
 ].filter(Boolean);

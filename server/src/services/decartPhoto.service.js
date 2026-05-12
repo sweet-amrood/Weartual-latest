@@ -5,6 +5,7 @@ import { accessSync, constants } from "fs";
 import { fileURLToPath } from "url";
 import AppError from "../utils/AppError.js";
 import { mergeDecartVendorPythonPath } from "../utils/decartPythonVendorEnv.js";
+import { getDecartApiKeysInRandomOrder, maskDecartApiKey } from "../utils/decartApiKeys.js";
 
 const DEFAULT_TIMEOUT_MS = 12 * 60 * 1000;
 const __filename = fileURLToPath(import.meta.url);
@@ -36,37 +37,24 @@ const resolveScriptPath = (configuredPath, fallbackPath) => {
   return { attempted: candidates };
 };
 
-/**
- * Runs Decart photo.py: person image + garment reference -> output image file (PNG).
- * Requires DECART_PHOTO_SCRIPT and DECART_API_KEY.
- */
-export const runDecartPhotoPipeline = ({
+const runDecartPhotoOnceWithKey = ({
+  scriptPath,
+  pythonBin,
   personImagePath,
   garmentImagePath,
   outputPath,
-  timeoutMs = DEFAULT_TIMEOUT_MS
+  timeoutMs,
+  apiKey
 }) =>
   new Promise((resolve, reject) => {
-    const resolved = resolveScriptPath(process.env.DECART_PHOTO_SCRIPT, DEFAULT_PHOTO_SCRIPT_PATH);
-
-    if (!(process.env.DECART_API_KEY || "").trim()) {
-      reject(new AppError("DECART_API_KEY is not set (required for image try-on).", 500));
-      return;
-    }
-
-    if (typeof resolved !== "string") {
-      reject(
-        new AppError(`Decart photo script cannot be read. Tried: ${resolved.attempted.join(" | ")}`, 500)
-      );
-      return;
-    }
-    const scriptPath = resolved;
-
-    const defaultPy = process.platform === "win32" ? "python" : "python3";
-    const pythonBin = (process.env.DECART_PYTHON || defaultPy).trim() || defaultPy;
     const absPerson = path.resolve(personImagePath);
     const absGarment = path.resolve(garmentImagePath);
     const absOut = path.resolve(outputPath);
+
+    const env = mergeDecartVendorPythonPath({
+      ...process.env,
+      DECART_API_KEY: apiKey
+    });
 
     let settled = false;
     const finish = (fn) => {
@@ -76,7 +64,7 @@ export const runDecartPhotoPipeline = ({
     };
 
     const child = spawn(pythonBin, [scriptPath, absPerson, absGarment, absOut], {
-      env: mergeDecartVendorPythonPath(process.env),
+      env,
       stdio: ["ignore", "pipe", "pipe"]
     });
 
@@ -119,3 +107,64 @@ export const runDecartPhotoPipeline = ({
       finish(() => resolve({ outputPath: absOut }));
     });
   });
+
+/**
+ * Runs Decart photo.py: person image + garment reference -> output image file (PNG).
+ * Tries multiple API keys (DECART_API_KEYS / DECART_API_KEY) in random order until one succeeds.
+ */
+export const runDecartPhotoPipeline = async ({
+  personImagePath,
+  garmentImagePath,
+  outputPath,
+  timeoutMs = DEFAULT_TIMEOUT_MS
+}) => {
+  const keys = getDecartApiKeysInRandomOrder();
+  if (!keys.length) {
+    throw new AppError(
+      "No Decart API keys configured. Set DECART_API_KEY and/or DECART_API_KEYS (comma-separated).",
+      500
+    );
+  }
+
+  const resolved = resolveScriptPath(process.env.DECART_PHOTO_SCRIPT, DEFAULT_PHOTO_SCRIPT_PATH);
+  if (typeof resolved !== "string") {
+    throw new AppError(`Decart photo script cannot be read. Tried: ${resolved.attempted.join(" | ")}`, 500);
+  }
+  const scriptPath = resolved;
+
+  const defaultPy = process.platform === "win32" ? "python" : "python3";
+  const pythonBin = (process.env.DECART_PYTHON || defaultPy).trim() || defaultPy;
+  const absOut = path.resolve(outputPath);
+
+  let lastError = null;
+  for (let i = 0; i < keys.length; i += 1) {
+    const apiKey = keys[i];
+    try {
+      await fs.unlink(absOut).catch(() => {});
+      console.info(`[decart-photo] attempt ${i + 1}/${keys.length} key=${maskDecartApiKey(apiKey)}`);
+      const result = await runDecartPhotoOnceWithKey({
+        scriptPath,
+        pythonBin,
+        personImagePath,
+        garmentImagePath,
+        outputPath,
+        timeoutMs,
+        apiKey
+      });
+      return result;
+    } catch (err) {
+      const msg = err instanceof AppError ? err.message : String(err?.message || err);
+      console.warn(`[decart-photo] key ${maskDecartApiKey(apiKey)} failed: ${msg.slice(0, 400)}`);
+      lastError = err instanceof AppError ? err : new AppError(msg, 502);
+    }
+  }
+
+  const code =
+    lastError instanceof AppError && typeof lastError.statusCode === "number" && lastError.statusCode >= 400
+      ? lastError.statusCode
+      : 502;
+  throw new AppError(
+    `All ${keys.length} Decart API key(s) failed for image try-on. Last error: ${lastError?.message || "unknown"}`,
+    code
+  );
+};
