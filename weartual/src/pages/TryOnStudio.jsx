@@ -11,11 +11,7 @@ import {
   ThumbsUp,
   ThumbsDown,
   Star,
-  MessageCircle,
-  Music2,
   Link2,
-  Share2,
-  Send,
   Code2,
   Terminal,
   Layers,
@@ -57,15 +53,6 @@ const staticUiDatasetSamples = (type) => {
   });
 };
 
-const pickRandomItems = (items, count = 4) => {
-  const source = [...items];
-  for (let i = source.length - 1; i > 0; i -= 1) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [source[i], source[j]] = [source[j], source[i]];
-  }
-  return source.slice(0, count);
-};
-
 const VIDEO_NAME_RE = /\.(mp4|webm|mov|m4v)$/i;
 const IMAGE_NAME_RE = /\.(jpe?g|png|webp)$/i;
 
@@ -104,7 +91,7 @@ export default function TryOnStudio({ user }) {
   const [personMediaType, setPersonMediaType] = useState("image");
   const [status, setStatus] = useState("idle");
   const [error, setError] = useState("");
-  /** After first Generate (or suggestion try-on), show centered output + loading/result. */
+  /** After first Generate, show centered output + loading/result. */
   const [showOutputSection, setShowOutputSection] = useState(false);
   const [resultImage, setResultImage] = useState(null);
   const [resultMediaType, setResultMediaType] = useState("image");
@@ -120,13 +107,11 @@ export default function TryOnStudio({ user }) {
   const [scanOffset, setScanOffset] = useState(-20);
   const [comparePosition, setComparePosition] = useState(50);
   const [compareImageWidth, setCompareImageWidth] = useState(0);
-  const [resultAspectRatio, setResultAspectRatio] = useState(null);
   const [currentOutfitId, setCurrentOutfitId] = useState(null);
   const [selectedRating, setSelectedRating] = useState(null);
   const [selectedStars, setSelectedStars] = useState(0);
   const [animatedRating, setAnimatedRating] = useState(null);
   const [ratingLocked, setRatingLocked] = useState(false);
-  const [improvementSuggestions, setImprovementSuggestions] = useState([]);
   const [shareFeedback, setShareFeedback] = useState("");
   const [resultVideoError, setResultVideoError] = useState("");
   const [isImageFullscreenOpen, setIsImageFullscreenOpen] = useState(false);
@@ -409,22 +394,6 @@ export default function TryOnStudio({ user }) {
   }, [status, resultImage, personPreview, personMediaType]);
 
   useEffect(() => {
-    if (!resultImage || resultMediaType !== "image") {
-      setResultAspectRatio(null);
-      return undefined;
-    }
-
-    const img = new Image();
-    img.onload = () => {
-      if (img.naturalWidth > 0 && img.naturalHeight > 0) {
-        setResultAspectRatio(img.naturalWidth / img.naturalHeight);
-      }
-    };
-    img.src = resultImage;
-    return undefined;
-  }, [resultImage, resultMediaType]);
-
-  useEffect(() => {
     if (!currentOutfitId) {
       setSelectedRating(null);
       setSelectedStars(0);
@@ -436,13 +405,6 @@ export default function TryOnStudio({ user }) {
     setSelectedStars(existing?.stars || 0);
     setRatingLocked(!!existing);
   }, [currentOutfitId, user]);
-
-  useEffect(() => {
-    const candidateSuggestions = clothSamples.length
-      ? clothSamples.map((sample) => ({ url: sample.url, name: sample.fileName || "Suggested cloth" }))
-      : LOCAL_CLOTH_DATASET.map((url, idx) => ({ url, name: `Cloth ${idx + 1}` }));
-    setImprovementSuggestions(pickRandomItems(candidateSuggestions, 4));
-  }, [clothSamples]);
 
   const handleHeroMouseMove = (e) => {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -549,10 +511,6 @@ export default function TryOnStudio({ user }) {
         name: garment?.name ? `Try-on: ${garment.name}` : "Generated outfit look",
         resultType: job.resultType === "video" || inferResultIsVideo(job) ? "video" : "image"
       });
-      const candidateSuggestions = clothSamples.length
-        ? clothSamples.map((sample) => ({ url: sample.url, name: sample.fileName || "Suggested cloth" }))
-        : LOCAL_CLOTH_DATASET.map((url, idx) => ({ url, name: `Cloth ${idx + 1}` }));
-      setImprovementSuggestions(pickRandomItems(candidateSuggestions, 4));
       setCurrentJobId(resolvedJobId);
     } catch (err) {
       setStatus("error");
@@ -609,7 +567,6 @@ export default function TryOnStudio({ user }) {
       setSelectedStars(0);
       setRatingLocked(false);
       setShareFeedback("");
-      setImprovementSuggestions([]);
     } catch (err) {
       setError(err?.message || "Could not delete this result from the server.");
     }
@@ -662,25 +619,6 @@ export default function TryOnStudio({ user }) {
     window.setTimeout(() => setAnimatedRating(null), 220);
   };
 
-  const handleSuggestionClick = async (suggestion) => {
-    if (!personFile || !suggestion?.url || isProcessing) return;
-    setShowOutputSection(true);
-    try {
-      const response = await fetch(suggestion.url);
-      const blob = await response.blob();
-      const contentType = blob.type || "image/jpeg";
-      const extension = contentType.includes("png") ? "png" : contentType.includes("webp") ? "webp" : "jpg";
-      const suggestionFile = new File([blob], suggestion.name || `suggested-cloth.${extension}`, { type: contentType });
-      if (garmentPreview) URL.revokeObjectURL(garmentPreview);
-      const nextPreview = URL.createObjectURL(suggestionFile);
-      setGarmentFile(suggestionFile);
-      setGarmentPreview(nextPreview);
-      await executeTryOn({ person: personFile, garment: suggestionFile });
-    } catch {
-      setError("Could not load suggested cloth image.");
-    }
-  };
-
   const downloadCurrentResult = () => {
     if (!resultImage) return;
     const a = document.createElement("a");
@@ -711,33 +649,12 @@ export default function TryOnStudio({ user }) {
     }
   };
 
-  const openShareUrl = (url) => {
-    window.open(url, "_blank", "noopener,noreferrer");
-  };
-
-  const handleSocialShare = async (platform) => {
-    if (!resultImage) return;
-    const encodedUrl = encodeURIComponent(resultImage);
-    const message = encodeURIComponent(`Check out my AI try-on ${resultMediaType === "video" ? "video" : "look"}!`);
-
-    if (platform === "facebook") {
-      openShareUrl(`https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}`);
-      return;
+  const handleCopyLinkClick = async () => {
+    const ok = await copyImageLink();
+    if (!ok) {
+      setShareFeedback("Could not copy link (clipboard unavailable).");
+      window.setTimeout(() => setShareFeedback(""), 2200);
     }
-    if (platform === "twitter") {
-      openShareUrl(`https://twitter.com/intent/tweet?text=${message}&url=${encodedUrl}`);
-      return;
-    }
-    if (platform === "whatsapp") {
-      openShareUrl(`https://api.whatsapp.com/send?text=${message}%20${encodedUrl}`);
-      return;
-    }
-
-    // TikTok web share is limited: fallback to copy link, then download.
-    const copied = await copyImageLink();
-    if (!copied) downloadCurrentResult();
-    setShareFeedback(copied ? "TikTok fallback: link copied." : `TikTok fallback: ${resultMediaType} downloaded.`);
-    window.setTimeout(() => setShareFeedback(""), 2000);
   };
 
   return (
@@ -924,23 +841,23 @@ export default function TryOnStudio({ user }) {
         </div>
 
         {showOutputSection && (
-          <div className="mx-auto mt-10 w-full max-w-5xl">
+          <div className="mx-auto mt-8 w-full max-w-md">
             <div
-              className={`rounded-3xl border border-slate-200 bg-white p-3 flex flex-col dark:border-slate-700 dark:bg-slate-900 ${
-                status === "success" && resultImage ? "h-auto" : "min-h-[360px] sm:min-h-[420px]"
+              className={`rounded-2xl border border-slate-200 bg-white p-2 flex flex-col dark:border-slate-700 dark:bg-slate-900 ${
+                status === "success" && resultImage ? "h-auto" : "min-h-[200px] sm:min-h-[220px]"
               }`}
             >
-              <div className="flex flex-wrap items-center justify-between gap-2 px-1 pb-2">
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                  <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-500">Result Preview</h3>
+              <div className="flex flex-wrap items-center justify-between gap-2 px-1 pb-2 sm:flex-nowrap">
+                <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 sm:flex-nowrap">
+                  <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-500 shrink-0">Result Preview</h3>
                 </div>
                 {status === "success" && resultImage && (
-                  <div className="flex flex-wrap items-center justify-end gap-2 w-full sm:w-auto">
+                  <div className="flex max-w-full flex-nowrap items-center justify-end gap-1.5 overflow-x-auto sm:min-w-0 sm:flex-1 sm:justify-end">
                     {currentJobId ? (
                       <button
                         type="button"
                         onClick={deleteCurrentResultFromServer}
-                        className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg border border-rose-200 bg-rose-50 text-rose-700 text-xs font-semibold hover:bg-rose-100 transition-colors"
+                        className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-100 transition-colors"
                       >
                         <Trash2 className="w-3.5 h-3.5" /> Delete from server
                       </button>
@@ -948,7 +865,7 @@ export default function TryOnStudio({ user }) {
                     <button
                       type="button"
                       onClick={downloadCurrentResult}
-                      className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg bg-brand-600 text-white text-xs font-semibold hover:bg-brand-500 transition-colors"
+                      className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg bg-brand-600 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-brand-500 transition-colors"
                     >
                       <Download className="w-3.5 h-3.5" /> Download {resultMediaType === "video" ? "Video" : "Image"}
                     </button>
@@ -956,53 +873,20 @@ export default function TryOnStudio({ user }) {
                       <button
                         type="button"
                         onClick={openResultFullscreen}
-                        className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-700 text-xs font-semibold hover:bg-slate-50 transition-colors"
+                        className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
                       >
                         <Maximize2 className="w-3.5 h-3.5" /> Full Screen
                       </button>
                     )}
-                    <div className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-1 py-1">
-                      <button
-                        type="button"
-                        onClick={() => handleSocialShare("facebook")}
-                        className="p-1.5 rounded-md text-slate-600 hover:text-blue-600 hover:bg-blue-50 transition-all"
-                        aria-label="Share on Facebook"
-                      >
-                        <Share2 className="w-4 h-4" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleSocialShare("whatsapp")}
-                        className="p-1.5 rounded-md text-slate-600 hover:text-emerald-600 hover:bg-emerald-50 transition-all"
-                        aria-label="Share on WhatsApp"
-                      >
-                        <MessageCircle className="w-4 h-4" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleSocialShare("twitter")}
-                        className="p-1.5 rounded-md text-slate-600 hover:text-sky-600 hover:bg-sky-50 transition-all"
-                        aria-label="Share on Twitter"
-                      >
-                        <Send className="w-4 h-4" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleSocialShare("tiktok")}
-                        className="p-1.5 rounded-md text-slate-600 hover:text-violet-600 hover:bg-violet-50 transition-all"
-                        aria-label="Share on TikTok"
-                      >
-                        <Music2 className="w-4 h-4" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={copyImageLink}
-                        className="p-1.5 rounded-md text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-all"
-                        aria-label="Copy image link"
-                      >
-                        <Link2 className="w-4 h-4" />
-                      </button>
-                    </div>
+                    <button
+                      type="button"
+                      onClick={handleCopyLinkClick}
+                      title="Copy link"
+                      className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 dark:hover:text-white"
+                      aria-label="Copy result link"
+                    >
+                      <Link2 className="w-3.5 h-3.5" />
+                    </button>
                   </div>
                 )}
               </div>
@@ -1011,12 +895,16 @@ export default function TryOnStudio({ user }) {
                 <p className="px-1 pb-2 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-2">{resultVideoError}</p>
               )}
               <div
-                className={`rounded-2xl bg-slate-100 overflow-hidden dark:bg-slate-800/80 ${
-                  isProcessing ? "min-h-[320px]" : status === "success" && resultImage ? "" : "min-h-[260px]"
+                className={`rounded-xl bg-slate-100 overflow-hidden dark:bg-slate-800/80 ${
+                  isProcessing
+                    ? "flex min-h-[200px] items-center justify-center"
+                    : status === "success" && resultImage
+                      ? "leading-none"
+                      : "flex min-h-[160px] items-center justify-center"
                 }`}
               >
                 {isProcessing ? (
-                  <div className="w-full h-full min-h-[320px] flex items-center justify-center p-6 bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-900">
+                  <div className="w-full h-full min-h-[200px] flex items-center justify-center p-4 sm:p-6 bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-900">
                     <div className="w-full max-w-md rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl p-8 text-center shadow-2xl relative overflow-hidden">
                       <div className="absolute inset-0 opacity-40 bg-[radial-gradient(circle_at_50%_10%,rgba(56,189,248,0.25),transparent_38%)]" />
                       <div className="relative mx-auto mb-5 w-16 h-16">
@@ -1044,12 +932,8 @@ export default function TryOnStudio({ user }) {
                     </div>
                   </div>
                 ) : status === "success" && resultImage && resultMediaType === "image" && personPreview && personMediaType === "image" ? (
-                  <div
-                    ref={compareRef}
-                    className="relative w-full overflow-hidden bg-black select-none"
-                    style={resultAspectRatio ? { aspectRatio: `${resultAspectRatio}` } : undefined}
-                  >
-                    <img src={personPreview} alt="Person before try-on" className="block w-full h-auto" draggable={false} />
+                  <div ref={compareRef} className="relative w-full overflow-hidden bg-black select-none leading-none">
+                    <img src={personPreview} alt="Person before try-on" className="block h-auto w-full" draggable={false} />
                     <div className="absolute inset-y-0 left-0 overflow-hidden" style={{ width: `${comparePosition}%` }}>
                       <img
                         src={resultImage}
@@ -1093,7 +977,7 @@ export default function TryOnStudio({ user }) {
                       controls
                       playsInline
                       preload="metadata"
-                      className="w-full h-full min-h-[260px] object-contain bg-black"
+                      className="mx-auto block h-auto w-full max-w-full bg-black object-contain"
                       onError={() =>
                         setResultVideoError(
                           "This video URL loaded but the browser cannot decode it. Typical cause: OpenCV mp4v output. Install FFmpeg on the API server (see server logs) so the pipeline can re-encode to H.264, or try opening the link in Chrome."
@@ -1101,8 +985,8 @@ export default function TryOnStudio({ user }) {
                       }
                     />
                   ) : (
-                    <div>
-                      <img src={resultImage} alt="Generated try-on" className="w-full h-full object-cover" />
+                    <div className="flex w-full justify-center">
+                      <img src={resultImage} alt="Generated try-on" className="block h-auto max-w-full object-contain" />
                     </div>
                   )
                 ) : status === "error" ? (
@@ -1162,26 +1046,6 @@ export default function TryOnStudio({ user }) {
                     })}
                   </div>
                   {ratingLocked && <p className="text-xs text-slate-500">Rating locked for this saved outfit.</p>}
-                </div>
-              )}
-              {status === "success" && resultImage && (
-                <div className="pt-4">
-                  <h4 className="text-sm font-semibold uppercase tracking-wider text-slate-500 mb-2">Suggested Improvements</h4>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                    {improvementSuggestions.map((item, idx) => (
-                      <button
-                        key={`${item.url}-${idx}`}
-                        type="button"
-                        onClick={() => handleSuggestionClick(item)}
-                        disabled={isProcessing}
-                        className="rounded-xl border border-slate-200 bg-white overflow-hidden transition-all hover:-translate-y-0.5 hover:shadow-md disabled:opacity-60 dark:border-slate-600 dark:bg-slate-800"
-                      >
-                        <div className="aspect-square bg-slate-100">
-                          <img src={item.url} alt={item.name || "Suggested cloth"} className="w-full h-full object-cover" loading="lazy" />
-                        </div>
-                      </button>
-                    ))}
-                  </div>
                 </div>
               )}
             </div>

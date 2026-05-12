@@ -29,7 +29,7 @@ export default function Navbar({ user, onLogout }) {
 
   // Link styling for a premium feel
   const navLinkClass = ({ isActive }) =>
-    `relative text-sm font-medium transition-colors px-1 py-2 group ${
+    `relative text-sm font-medium transition-colors px-1 py-1 group ${
       isActive
         ? "text-brand-600 dark:text-brand-400"
         : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100"
@@ -46,13 +46,13 @@ export default function Navbar({ user, onLogout }) {
   return (
     <nav className="glass sticky top-0 z-50 transition-all duration-300 border-b border-transparent dark:border-slate-800/80">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="h-20 flex items-center justify-between">
+        <div className="h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
             {!isAuthRoute && (
               <button
                 type="button"
                 onClick={() => setMobileMenuOpen((prev) => !prev)}
-                className="md:hidden inline-flex items-center justify-center rounded-xl border border-slate-200 dark:border-slate-600 p-2.5 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                className="md:hidden inline-flex items-center justify-center rounded-xl border border-slate-200 dark:border-slate-600 p-2 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                 aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
                 aria-expanded={mobileMenuOpen}
                 aria-controls="mobile-nav-menu"
@@ -63,11 +63,11 @@ export default function Navbar({ user, onLogout }) {
 
             {/* Brand */}
             <NavLink to="/" className="flex items-center gap-3 transition-transform hover:scale-[1.02] active:scale-95 duration-200">
-              <div className="h-10 w-10 rounded-xl bg-brand-900 shadow-md shadow-brand-900/20 text-white flex items-center justify-center font-serif text-xl font-bold italic">
+              <div className="h-9 w-9 rounded-xl bg-brand-900 shadow-md shadow-brand-900/20 text-white flex items-center justify-center font-serif text-lg font-bold italic">
                 W
               </div>
               <div className="leading-tight">
-                <div className="text-slate-900 dark:text-slate-100 font-serif font-bold tracking-tight text-xl">
+                <div className="text-slate-900 dark:text-slate-100 font-serif font-bold tracking-tight text-lg">
                   Weartual
                 </div>
                 <div className="text-[10px] uppercase tracking-wider font-semibold text-slate-500 dark:text-slate-400">
@@ -82,7 +82,7 @@ export default function Navbar({ user, onLogout }) {
             <button
               type="button"
               onClick={toggleTheme}
-              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white/80 text-slate-700 shadow-sm transition-colors hover:bg-slate-100 dark:border-slate-600 dark:bg-slate-800/80 dark:text-amber-200 dark:hover:bg-slate-700"
+              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white/80 text-slate-700 shadow-sm transition-colors hover:bg-slate-100 dark:border-slate-600 dark:bg-slate-800/80 dark:text-amber-200 dark:hover:bg-slate-700"
               aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
               title={theme === "dark" ? "Light mode" : "Dark mode"}
             >
@@ -135,13 +135,13 @@ export default function Navbar({ user, onLogout }) {
 
             {user ? (
               !isAuthRoute && (
-                <div className="hidden md:flex items-center gap-3 border-l border-slate-200 dark:border-slate-600 pl-6 ml-2">
+                <div className="hidden md:flex items-center gap-3 border-l border-slate-200 dark:border-slate-600 pl-5 ml-1">
                   <NavLink
                     to="/profile"
                     title="Profile"
                     aria-label="Open profile"
                     className={({ isActive }) =>
-                      `flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-brand-50 to-indigo-50 dark:from-slate-800 dark:to-slate-900 transition-shadow outline-none focus-visible:outline-none ${
+                      `flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-brand-50 to-indigo-50 dark:from-slate-800 dark:to-slate-900 transition-shadow outline-none focus-visible:outline-none ${
                         isActive
                           ? "ring-2 ring-brand-600 ring-offset-2 ring-offset-white dark:ring-offset-slate-950 shadow-sm"
                           : "border-2 border-slate-200 dark:border-slate-600 hover:border-brand-400 hover:shadow-sm"
@@ -159,7 +159,7 @@ export default function Navbar({ user, onLogout }) {
                   <button
                     type="button"
                     onClick={handleLogout}
-                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-slate-900/20 hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:shadow-slate-900/10 dark:hover:bg-white transition-all hover:-translate-y-0.5 active:translate-y-0"
+                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-slate-900/20 hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:shadow-slate-900/10 dark:hover:bg-white transition-all hover:-translate-y-0.5 active:translate-y-0"
                   >
                     <LogOut className="w-4 h-4" />
                     Logout
