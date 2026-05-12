@@ -4,6 +4,7 @@ import {
   forgotPassword,
   getCurrentUser,
   googleAuth,
+  linkGoogleAccount,
   login,
   logout,
   patchMe,
@@ -16,6 +17,7 @@ import { requireAuth } from "../middlewares/auth.middleware.js";
 import {
   forgotPasswordValidation,
   googleAuthValidation,
+  linkGoogleValidation,
   loginValidation,
   patchMeValidation,
   postMeNotificationsValidation,
@@ -38,6 +40,7 @@ router.post("/forgot-password", forgotPasswordValidation, validate, forgotPasswo
 router.post("/reset-password/:token", resetPasswordValidation, validate, resetPassword);
 
 router.patch("/me", requireAuth, patchMeValidation, validate, patchMe);
+router.post("/me/link-google", requireAuth, linkGoogleValidation, validate, linkGoogleAccount);
 router.post("/me/avatar", requireAuth, upload.single("avatar"), uploadMeAvatar);
 router.post("/me/notifications", requireAuth, postMeNotificationsValidation, validate, updateMeNotifications);
 router.get("/me", requireAuth, getCurrentUser);

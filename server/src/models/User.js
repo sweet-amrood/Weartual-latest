@@ -24,6 +24,23 @@ const userSchema = new mongoose.Schema(
       enum: ["web", "google"],
       default: "web"
     },
+    /** Google OIDC `sub` — stable per Google account; links web + Google to one MongoDB user. */
+    googleSub: {
+      type: String,
+      default: null,
+      sparse: true,
+      unique: true,
+      trim: true,
+      maxlength: 256
+    },
+    /** When linked Google email differs from `email`, stored for display. */
+    linkedGoogleEmail: {
+      type: String,
+      default: null,
+      lowercase: true,
+      trim: true,
+      maxlength: 320
+    },
     password: {
       type: String,
       required: true,

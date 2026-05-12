@@ -36,6 +36,13 @@ export const googleAuth = (payload) =>
     body: JSON.stringify(payload)
   });
 
+/** Link Google to the logged-in account (web / email-password accounts only; Google email must match profile). */
+export const linkGoogleAccount = (payload) =>
+  request("/api/auth/me/link-google", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+
 export const forgotPassword = (payload) =>
   request("/api/auth/forgot-password", {
     method: "POST",

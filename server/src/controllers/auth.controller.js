@@ -3,6 +3,7 @@ import {
   forgotPasswordService,
   getCurrentUserService,
   googleAuthService,
+  linkGoogleToWebAccountService,
   loginService,
   resetPasswordService,
   signupService,
@@ -55,6 +56,19 @@ export const login = asyncHandler(async (req, res) => {
   res.status(200).json({
     success: true,
     message: "Login successful",
+    token,
+    user
+  });
+});
+
+export const linkGoogleAccount = asyncHandler(async (req, res) => {
+  const incomingToken = req.body?.token || req.body?.idToken;
+  const { token, user } = await linkGoogleToWebAccountService(req.user.userId, incomingToken);
+
+  res.cookie("token", token, cookieOptions);
+  res.status(200).json({
+    success: true,
+    message: "Google account linked. Sign in with that Google account anytime — it opens this same Weartual profile.",
     token,
     user
   });

@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
+import { GoogleLogin } from "@react-oauth/google";
 import {
   Camera,
   History,
@@ -7,6 +8,7 @@ import {
   LayoutGrid,
   Lightbulb,
   Loader2,
+  LogIn,
   Mail,
   Save,
   Sparkles,
@@ -14,7 +16,7 @@ import {
   User,
   Shield
 } from "lucide-react";
-import { getMe, patchMe, uploadMyAvatar } from "../services/authApi";
+import { getMe, patchMe, uploadMyAvatar, linkGoogleAccount } from "../services/authApi";
 
 /** Built-in illustrated avatars (DiceBear); stored as `avatarUrl` via PATCH. */
 const DEFAULT_AVATAR_OPTIONS = [
@@ -39,6 +41,9 @@ export default function Profile({ user, onUserUpdated }) {
   const [avatarBusy, setAvatarBusy] = useState(false);
   const [avatarMessage, setAvatarMessage] = useState("");
   const [avatarError, setAvatarError] = useState("");
+  const [googleLinkBusy, setGoogleLinkBusy] = useState(false);
+  const [googleLinkError, setGoogleLinkError] = useState("");
+  const [googleLinkMessage, setGoogleLinkMessage] = useState("");
 
   const applyUser = useCallback((u) => {
     if (!u) return;
@@ -71,9 +76,36 @@ export default function Profile({ user, onUserUpdated }) {
     return () => {
       cancelled = true;
     };
-  }, [applyUser]);
+  }, [applyUser, onUserUpdated]);
+
+  useEffect(() => {
+    if (user?.googleLinked) {
+      setGoogleLinkError("");
+      setGoogleLinkMessage("");
+    }
+  }, [user?.googleLinked]);
 
   const displayUser = user;
+
+  const handleLinkGoogle = async (credentialResponse) => {
+    const token = credentialResponse?.credential;
+    if (!token) {
+      setGoogleLinkError("Google did not return a credential.");
+      return;
+    }
+    setGoogleLinkError("");
+    setGoogleLinkMessage("");
+    setGoogleLinkBusy(true);
+    try {
+      const res = await linkGoogleAccount({ token });
+      if (res?.user) onUserUpdated?.(res.user);
+      setGoogleLinkMessage(res?.message || "Google account linked.");
+    } catch (err) {
+      setGoogleLinkError(err?.message || "Could not link Google account.");
+    } finally {
+      setGoogleLinkBusy(false);
+    }
+  };
 
   const handleSaveProfile = async (e) => {
     e.preventDefault();
@@ -325,6 +357,38 @@ export default function Profile({ user, onUserUpdated }) {
           </form>
         </section>
 
+        {displayUser && !displayUser.googleLinked && (
+          <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm mb-6 dark:border-slate-700 dark:bg-slate-900">
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-300 mb-3 flex items-center gap-2">
+              <LogIn className="w-4 h-4" /> Link Google account
+            </h2>
+            <p className="text-sm text-slate-600 dark:text-slate-400 mb-4 leading-relaxed">
+              Connect a Google account to this profile. The Google email <span className="font-medium text-slate-800 dark:text-slate-200">does not need to match</span> your Weartual login email (
+              <span className="font-medium text-slate-800 dark:text-slate-200">{displayUser.email}</span>
+              ). After linking, signing in with <span className="font-medium text-slate-800 dark:text-slate-200">email and password</span> or with{" "}
+              <span className="font-medium text-slate-800 dark:text-slate-200">that Google account</span> opens the same account, history, and settings.
+            </p>
+            <div
+              className={`flex flex-wrap items-center gap-3 ${googleLinkBusy ? "pointer-events-none opacity-60" : ""}`}
+            >
+              <GoogleLogin
+                onSuccess={handleLinkGoogle}
+                onError={() => setGoogleLinkError("Google sign-in was cancelled or failed to start.")}
+                useOneTap={false}
+                text="continue_with"
+                shape="rectangular"
+                theme="outline"
+                size="large"
+              />
+              {googleLinkBusy ? <Loader2 className="w-5 h-5 animate-spin text-slate-500" aria-hidden /> : null}
+            </div>
+            {googleLinkMessage ? (
+              <p className="mt-3 text-sm text-emerald-600 dark:text-emerald-400">{googleLinkMessage}</p>
+            ) : null}
+            {googleLinkError ? <p className="mt-3 text-sm text-red-600 dark:text-red-400">{googleLinkError}</p> : null}
+          </section>
+        )}
+
         {/* Explore & tips */}
         <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm mb-6 dark:border-slate-700 dark:bg-slate-900">
           <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-500 mb-4 flex items-center gap-2">
@@ -391,7 +455,12 @@ export default function Profile({ user, onUserUpdated }) {
         </section>
 
         <p className="text-center text-xs text-slate-400">
-          Signed in as <span className="font-medium text-slate-600">{displayUser?.email}</span>
+          Signed in as <span className="font-medium text-slate-600 dark:text-slate-300">{displayUser?.email}</span>
+          {displayUser?.googleLinked && displayUser?.linkedGoogleEmail ? (
+            <span className="block mt-1">
+              Google linked: <span className="font-medium text-slate-600 dark:text-slate-300">{displayUser.linkedGoogleEmail}</span>
+            </span>
+          ) : null}
           {typeof displayUser?.totalLookCount === "number" ? (
             <span className="block mt-1">Saved try-ons: {displayUser.totalLookCount}</span>
           ) : null}

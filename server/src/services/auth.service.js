@@ -13,6 +13,8 @@ const sanitizeUser = (user) => ({
   username: user.username,
   email: user.email,
   loginPlatform: user.loginPlatform,
+  googleLinked: Boolean(user.googleSub),
+  linkedGoogleEmail: user.linkedGoogleEmail ?? null,
   totalLookCount: typeof user.totalLookCount === "number" && !Number.isNaN(user.totalLookCount) ? user.totalLookCount : 0,
   avatarUrl: user.avatarUrl ?? null,
   avatarPreset: user.avatarPreset ?? null,
@@ -39,6 +41,91 @@ const buildUniqueUsername = async (seed) => {
   }
 
   return candidate;
+};
+
+/** Verify a Google ID token and return the payload (throws AppError on failure). */
+const verifyGoogleIdToken = async (idToken) => {
+  const googleClientIds = (process.env.GOOGLE_CLIENT_ID || "")
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+  if (googleClientIds.length === 0) {
+    throw new AppError("Google auth is not configured on server", 503);
+  }
+  if (!idToken || typeof idToken !== "string") {
+    throw new AppError("Invalid Google token", 401);
+  }
+  const trimmedToken = idToken.trim();
+  if (process.env.NODE_ENV !== "production") {
+    console.info("[auth][google] token received:", {
+      length: trimmedToken.length,
+      prefix: trimmedToken.slice(0, 16),
+      configuredAudiences: googleClientIds
+    });
+  }
+  const googleClient = new OAuth2Client();
+  try {
+    const ticket = await googleClient.verifyIdToken({
+      idToken: trimmedToken,
+      audience: googleClientIds
+    });
+    const payload = ticket.getPayload();
+    if (process.env.NODE_ENV !== "production") {
+      console.info("[auth][google] payload verified:", {
+        aud: payload?.aud,
+        iss: payload?.iss,
+        email: payload?.email,
+        emailVerified: payload?.email_verified
+      });
+    }
+    return payload;
+  } catch (error) {
+    if (process.env.NODE_ENV !== "production") {
+      console.error("[auth][google] verifyIdToken failed:", error?.message || error);
+    }
+    throw new AppError(`Invalid Google token: ${error?.message || "Verification failed"}`, 401);
+  }
+};
+
+/** Link a Google identity (any verified email) to the logged-in Weartual user. Same `googleSub` = same account on Google sign-in. */
+export const linkGoogleToWebAccountService = async (userId, idToken) => {
+  const user = await User.findById(userId);
+  if (!user) throw new AppError("User not found", 404);
+  if (user.googleSub) {
+    throw new AppError("A Google account is already linked to this profile.", 400);
+  }
+
+  const payload = await verifyGoogleIdToken(idToken);
+  const sub = typeof payload?.sub === "string" ? payload.sub.trim() : "";
+  const email = payload?.email?.toLowerCase();
+  const isEmailVerified = payload?.email_verified;
+  if (!sub) {
+    throw new AppError("Google token did not include a subject (sub)", 400);
+  }
+  if (!email || !isEmailVerified) {
+    throw new AppError("Google account email is not verified", 400);
+  }
+
+  const otherSub = await User.findOne({ googleSub: sub, _id: { $ne: user._id } });
+  if (otherSub) {
+    throw new AppError("This Google account is already linked to a different Weartual user.", 409);
+  }
+
+  const otherEmail = await User.findOne({ email, _id: { $ne: user._id } });
+  if (otherEmail) {
+    throw new AppError(
+      "This Google email is already used by another Weartual account. Sign in with that account or use a different Google account to link.",
+      409
+    );
+  }
+
+  user.googleSub = sub;
+  user.linkedGoogleEmail = email !== user.email ? email : null;
+  await user.save();
+
+  const token = signJwt({ userId: user._id });
+  const fresh = await User.findById(userId);
+  return { token, user: sanitizeUser(fresh) };
 };
 
 export const signupService = async ({ username, email, password }) => {
@@ -70,55 +157,22 @@ export const loginService = async ({ email, password }) => {
 };
 
 export const googleAuthService = async ({ idToken }) => {
-  const googleClientIds = (process.env.GOOGLE_CLIENT_ID || "")
-    .split(",")
-    .map((value) => value.trim())
-    .filter(Boolean);
-  if (googleClientIds.length === 0) {
-    throw new AppError("Google auth is not configured on server", 503);
-  }
-  if (!idToken || typeof idToken !== "string") {
-    throw new AppError("Invalid Google token", 401);
-  }
-  const trimmedToken = idToken.trim();
-  if (process.env.NODE_ENV !== "production") {
-    console.info("[auth][google] token received:", {
-      length: trimmedToken.length,
-      prefix: trimmedToken.slice(0, 16),
-      configuredAudiences: googleClientIds
-    });
-  }
-  const googleClient = new OAuth2Client();
+  const payload = await verifyGoogleIdToken(idToken);
 
-  let payload;
-  try {
-    const ticket = await googleClient.verifyIdToken({
-      idToken: trimmedToken,
-      audience: googleClientIds
-    });
-    payload = ticket.getPayload();
-    if (process.env.NODE_ENV !== "production") {
-      console.info("[auth][google] payload verified:", {
-        aud: payload?.aud,
-        iss: payload?.iss,
-        email: payload?.email,
-        emailVerified: payload?.email_verified
-      });
-    }
-  } catch (error) {
-    if (process.env.NODE_ENV !== "production") {
-      console.error("[auth][google] verifyIdToken failed:", error?.message || error);
-    }
-    throw new AppError(`Invalid Google token: ${error?.message || "Verification failed"}`, 401);
-  }
-
+  const sub = typeof payload?.sub === "string" ? payload.sub.trim() : "";
   const email = payload?.email?.toLowerCase();
   const isEmailVerified = payload?.email_verified;
+  if (!sub) {
+    throw new AppError("Google token did not include a subject (sub)", 400);
+  }
   if (!email || !isEmailVerified) {
     throw new AppError("Google account email is not verified", 400);
   }
 
-  let user = await User.findOne({ email });
+  let user = sub ? await User.findOne({ googleSub: sub }) : null;
+  if (!user) {
+    user = await User.findOne({ email });
+  }
   let isNewUser = false;
   if (!user) {
     isNewUser = true;
@@ -128,10 +182,21 @@ export const googleAuthService = async ({ idToken }) => {
       username,
       email,
       password: randomPassword,
-      loginPlatform: "google"
+      loginPlatform: "google",
+      googleSub: sub,
+      linkedGoogleEmail: null
     });
   } else {
+    if (user.googleSub && user.googleSub !== sub) {
+      throw new AppError("This email is registered to a different Google account. Use the matching Google sign-in.", 409);
+    }
+    if (!user.googleSub) {
+      user.googleSub = sub;
+    }
     user.loginPlatform = "google";
+    if (user.linkedGoogleEmail == null && email && email !== user.email) {
+      user.linkedGoogleEmail = email;
+    }
     await user.save();
   }
 

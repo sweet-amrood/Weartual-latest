@@ -40,6 +40,9 @@ export const googleAuthValidation = [
   })
 ];
 
+/** Same body rules as Google sign-in (credential JWT in `token` or `idToken`). */
+export const linkGoogleValidation = googleAuthValidation;
+
 export const forgotPasswordValidation = [
   body("email").isEmail().withMessage("Valid email is required").normalizeEmail()
 ];
