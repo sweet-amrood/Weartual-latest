@@ -1,20 +1,29 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, lazy, Suspense } from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
-import Login from "./pages/login";
-import Signup from "./pages/signup";
-import ForgetPassword from "./pages/forgetpassword";
-import ResetPassword from "./pages/ResetPassword";
 import Navbar from "./components/Navbar";
 import AnimatedRoutesLayout from "./components/AnimatedRoutesLayout";
-import LandingPage from "./pages/LandingPage";
-import TryOnStudio from "./pages/TryOnStudio";
-import AboutUs from "./pages/AboutUs";
-import Contact from "./pages/Contact";
-import OutfitHistory from "./pages/OutfitHistory";
-import Profile from "./pages/Profile";
 import { getMe } from "./services/authApi";
 import { getAuthenticatedUserId, tryMigrateAnonymousOutfitHistory } from "./services/outfitHistory";
 import { useWeartualAppTour } from "./hooks/useWeartualAppTour";
+
+const LandingPage = lazy(() => import("./pages/LandingPage"));
+const TryOnStudio = lazy(() => import("./pages/TryOnStudio"));
+const AboutUs = lazy(() => import("./pages/AboutUs"));
+const Contact = lazy(() => import("./pages/Contact"));
+const OutfitHistory = lazy(() => import("./pages/OutfitHistory"));
+const Profile = lazy(() => import("./pages/Profile"));
+const Login = lazy(() => import("./pages/login"));
+const Signup = lazy(() => import("./pages/signup"));
+const ForgetPassword = lazy(() => import("./pages/forgetpassword"));
+const ResetPassword = lazy(() => import("./pages/ResetPassword"));
+
+function RouteFallback() {
+  return (
+    <div className="min-h-[60vh] flex items-center justify-center text-slate-600 dark:text-slate-400">
+      Loading...
+    </div>
+  );
+}
 
 function AppRoutes() {
   const [user, setUser] = useState(null);
@@ -65,7 +74,8 @@ function AppRoutes() {
   return (
     <>
       <Navbar user={user} onLogout={handleLogout} />
-      <Routes>
+      <Suspense fallback={<RouteFallback />}>
+        <Routes>
         <Route element={<AnimatedRoutesLayout />}>
           <Route path="/" element={<LandingPage />} />
           <Route path="/studio" element={<TryOnStudio user={user} />} />
@@ -121,7 +131,8 @@ function AppRoutes() {
           <Route path="/reset-password/:token" element={<ResetPassword />} />
           <Route path="*" element={<Navigate to="/" />} />
         </Route>
-      </Routes>
+        </Routes>
+      </Suspense>
     </>
   );
 }
