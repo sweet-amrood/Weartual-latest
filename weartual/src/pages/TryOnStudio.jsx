@@ -21,7 +21,10 @@ import {
   Wand2,
   ZoomIn,
   ZoomOut,
-  RotateCcw
+  RotateCcw,
+  Image as LucideImage,
+  Video,
+  Camera
 } from "lucide-react";
 import StyleInsightsPanel from "../components/StyleInsightsPanel";
 import {
@@ -33,6 +36,7 @@ import {
   removeOutfitRatingByOutfitId,
   saveOutfitRating
 } from "../services/outfitHistory";
+import { connectDecartVirtualTryOn } from "../services/decartRealtime";
 
 const PERSON_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const PERSON_VIDEO_TYPES = ["video/mp4", "video/webm", "video/quicktime"];
@@ -91,6 +95,13 @@ export default function TryOnStudio({ user }) {
   const [personPreview, setPersonPreview] = useState(null);
   const [garmentPreview, setGarmentPreview] = useState(null);
   const [personMediaType, setPersonMediaType] = useState("image");
+  /** Person source: file image, file video, or webcam capture (live). */
+  const [personInputMode, setPersonInputMode] = useState("image");
+  const [liveCameraActive, setLiveCameraActive] = useState(false);
+  const [liveCameraError, setLiveCameraError] = useState("");
+  const liveVideoRef = useRef(null);
+  /** Decart WebRTC session: camera input stream + realtime client (disconnect stops both). */
+  const decartSessionRef = useRef({ inputStream: null, realtimeClient: null });
   const [status, setStatus] = useState("idle");
   const [error, setError] = useState("");
   /** After first Generate, show centered output + loading/result. */
@@ -131,6 +142,64 @@ export default function TryOnStudio({ user }) {
 
   const personInputRef = useRef(null);
   const garmentInputRef = useRef(null);
+
+  const stopLiveCamera = useCallback(() => {
+    const { realtimeClient, inputStream } = decartSessionRef.current;
+    realtimeClient?.disconnect?.();
+    inputStream?.getTracks?.().forEach((t) => t.stop());
+    decartSessionRef.current = { inputStream: null, realtimeClient: null };
+    const v = liveVideoRef.current;
+    if (v) v.srcObject = null;
+    setLiveCameraActive(false);
+  }, []);
+
+  useEffect(() => {
+    return () => stopLiveCamera();
+  }, [stopLiveCamera]);
+
+  const startLiveCamera = useCallback(async () => {
+    setLiveCameraError("");
+    stopLiveCamera();
+    if (!garmentFile) {
+      setLiveCameraError("Add a garment image first — live try-on needs a reference outfit.");
+      return;
+    }
+    if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
+      setLiveCameraError("Camera is not supported in this browser.");
+      return;
+    }
+    try {
+      const { inputStream, realtimeClient } = await connectDecartVirtualTryOn({
+        garmentFile,
+        onRemoteStream: (editedStream) => {
+          const el = liveVideoRef.current;
+          if (el) {
+            el.srcObject = editedStream;
+            el.play().catch(() => {});
+          }
+        }
+      });
+      decartSessionRef.current = { inputStream, realtimeClient };
+      setLiveCameraActive(true);
+    } catch (e) {
+      setLiveCameraError(String(e?.message || "Could not start Decart live try-on."));
+    }
+  }, [garmentFile, stopLiveCamera]);
+
+  const handlePersonInputModeChange = useCallback(
+    (mode) => {
+      if (mode === personInputMode) return;
+      stopLiveCamera();
+      setLiveCameraError("");
+      if (personPreview) URL.revokeObjectURL(personPreview);
+      setPersonPreview(null);
+      setPersonFile(null);
+      setPersonMediaType("image");
+      if (personInputRef.current) personInputRef.current.value = "";
+      setPersonInputMode(mode);
+    },
+    [personInputMode, personPreview, stopLiveCamera]
+  );
   const isProcessing = useMemo(() => status === "analyzing", [status]);
   const canRun = !!personPreview && !!garmentPreview && !isProcessing;
 
@@ -437,12 +506,34 @@ export default function TryOnStudio({ user }) {
   const setPreview = (type, file) => {
     if (!file) return;
     const isPerson = type === "person";
-    const validTypes = isPerson ? [...PERSON_IMAGE_TYPES, ...PERSON_VIDEO_TYPES, "application/octet-stream"] : GARMENT_TYPES;
+    const detected = isPerson ? detectMediaType(file) : "image";
+    if (isPerson && personInputMode === "image" && detected === "video") {
+      return setError("Switch to Video to upload a person clip.");
+    }
+    if (isPerson && personInputMode === "video" && detected === "image") {
+      return setError("Switch to Image to upload a photo.");
+    }
+    if (isPerson && personInputMode === "live" && file.type !== "image/jpeg") {
+      return setError("Use Capture photo from the live camera, or switch to Image/Video to upload a file.");
+    }
+    const validTypes = isPerson
+      ? personInputMode === "video"
+        ? [...PERSON_VIDEO_TYPES, "application/octet-stream"]
+        : [...PERSON_IMAGE_TYPES, ...PERSON_VIDEO_TYPES, "application/octet-stream"]
+      : GARMENT_TYPES;
     const maxBytes = isPerson ? PERSON_MAX_BYTES : GARMENT_MAX_BYTES;
     const personOctetOk =
-      isPerson && file.type === "application/octet-stream" && (VIDEO_NAME_RE.test(file.name || "") || IMAGE_NAME_RE.test(file.name || ""));
+      isPerson &&
+      file.type === "application/octet-stream" &&
+      (VIDEO_NAME_RE.test(file.name || "") || IMAGE_NAME_RE.test(file.name || ""));
     if (!validTypes.includes(file.type) && !personOctetOk) {
-      return setError(isPerson ? "Invalid person file type. Use JPG/PNG/WEBP or MP4/WEBM/MOV." : "Invalid garment file type. Use JPG/PNG/WEBP.");
+      return setError(
+        isPerson
+          ? personInputMode === "video"
+            ? "Invalid person video. Use MP4, WEBM, or MOV."
+            : "Invalid person file type. Use JPG/PNG/WEBP or MP4/WEBM/MOV."
+          : "Invalid garment file type. Use JPG/PNG/WEBP."
+      );
     }
     if (file.size > maxBytes) return setError(isPerson ? "Person file too large. Max size is 100MB." : "Garment image too large. Max size is 10MB.");
     setError("");
@@ -463,6 +554,43 @@ export default function TryOnStudio({ user }) {
     setResultVideoError("");
     setCurrentJobId(null);
     setCurrentOutfitId(null);
+  };
+
+  const captureLiveFrame = () => {
+    const video = liveVideoRef.current;
+    if (!video || video.readyState < 2) {
+      setError("Wait for the camera preview, then capture again.");
+      return;
+    }
+    const w = video.videoWidth;
+    const h = video.videoHeight;
+    if (!w || !h) {
+      setError("Camera is not ready yet.");
+      return;
+    }
+    setError("");
+    const canvas = document.createElement("canvas");
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      setError("Could not capture frame.");
+      return;
+    }
+    ctx.drawImage(video, 0, 0, w, h);
+    canvas.toBlob(
+      (blob) => {
+        if (!blob) {
+          setError("Could not capture frame.");
+          return;
+        }
+        const file = new File([blob], `live-tryon-${Date.now()}.jpg`, { type: "image/jpeg" });
+        setPreview("person", file);
+        stopLiveCamera();
+      },
+      "image/jpeg",
+      0.92
+    );
   };
 
   const useSample = async (type, sample) => {
@@ -576,6 +704,8 @@ export default function TryOnStudio({ user }) {
 
   const clearType = (type) => {
     if (type === "person") {
+      stopLiveCamera();
+      setLiveCameraError("");
       if (personPreview) URL.revokeObjectURL(personPreview);
       setPersonPreview(null);
       setPersonFile(null);
@@ -772,23 +902,127 @@ export default function TryOnStudio({ user }) {
 
         <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
           {[
-            { key: "person", title: "Person Input (Image/Video)", preview: personPreview, ref: personInputRef, samples: personSamples },
+            { key: "person", title: "Person input", preview: personPreview, ref: personInputRef, samples: personSamples },
             { key: "garment", title: "Garment Image", preview: garmentPreview, ref: garmentInputRef, samples: clothSamples }
           ].map((block) => (
             <div key={block.key} className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
               <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-500 mb-3">{block.title}</h3>
+              {block.key === "person" && (
+                <div
+                  className="mb-3 flex rounded-xl border border-slate-200 bg-slate-100/90 p-0.5 dark:border-slate-600 dark:bg-slate-800/90"
+                  role="tablist"
+                  aria-label="Person input type"
+                >
+                  {[
+                    { id: "image", label: "Image", Icon: LucideImage },
+                    { id: "video", label: "Video", Icon: Video },
+                    { id: "live", label: "Live try-on", Icon: Camera }
+                  ].map(({ id, label, Icon }) => (
+                    <button
+                      key={id}
+                      type="button"
+                      role="tab"
+                      aria-selected={personInputMode === id}
+                      onClick={() => handlePersonInputModeChange(id)}
+                      className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-xs font-semibold transition-colors sm:text-[0.8125rem] ${
+                        personInputMode === id
+                          ? "bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white"
+                          : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100"
+                      }`}
+                    >
+                      <Icon className="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden />
+                      <span className="truncate">{label}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
               <div
                 className="relative rounded-2xl border border-slate-200 bg-slate-50 dark:border-slate-600 dark:bg-slate-800/50 min-h-[170px] sm:min-h-[190px] overflow-hidden"
-                onClick={() => !block.preview && block.ref.current?.click()}
+                onClick={() =>
+                  block.key === "person" && personInputMode === "live"
+                    ? undefined
+                    : !block.preview && block.ref.current?.click()
+                }
               >
                 <input
                   ref={block.ref}
                   type="file"
                   className="hidden"
-                  accept={block.key === "person" ? "image/jpeg,image/png,image/webp,video/mp4,video/webm,video/quicktime" : "image/jpeg,image/png,image/webp"}
+                  accept={
+                    block.key === "person"
+                      ? personInputMode === "video"
+                        ? "video/mp4,video/webm,video/quicktime"
+                        : personInputMode === "image"
+                          ? "image/jpeg,image/png,image/webp"
+                          : "image/jpeg"
+                      : "image/jpeg,image/png,image/webp"
+                  }
                   onChange={(e) => setPreview(block.key, e.target.files?.[0] || null)}
                 />
-                {block.preview ? (
+                {block.key === "person" && personInputMode === "live" && !block.preview ? (
+                  <div className="flex min-h-[170px] sm:min-h-[190px] flex-col items-center justify-center gap-3 bg-slate-50 p-4 text-center dark:bg-slate-800/50">
+                    <video
+                      ref={liveVideoRef}
+                      className={`max-h-[200px] w-full max-w-sm rounded-xl border border-slate-200 bg-black object-cover dark:border-slate-600 ${
+                        liveCameraActive ? "block" : "hidden"
+                      }`}
+                      playsInline
+                      muted
+                    />
+                    {!liveCameraActive ? (
+                      <p className="text-sm text-slate-500 dark:text-slate-400">
+                        Decart live virtual try-on (Lucy VTON): add a garment, then connect. The preview is the
+                        transformed camera stream.
+                      </p>
+                    ) : (
+                      <p className="text-xs text-slate-500 dark:text-slate-400">
+                        Tip: capture a frame if you also want to run offline Generate with the same look.
+                      </p>
+                    )}
+                    {liveCameraError ? (
+                      <p className="text-xs text-rose-600 dark:text-rose-400">{liveCameraError}</p>
+                    ) : null}
+                    <div className="flex flex-wrap items-center justify-center gap-2">
+                      {!liveCameraActive ? (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            startLiveCamera();
+                          }}
+                          className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 dark:bg-violet-600 dark:hover:bg-violet-500"
+                        >
+                          <Camera className="h-4 w-4" />
+                          Connect live try-on
+                        </button>
+                      ) : (
+                        <>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              captureLiveFrame();
+                            }}
+                            className="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-500"
+                          >
+                            <LucideImage className="h-4 w-4" />
+                            Capture frame for Generate
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              stopLiveCamera();
+                            }}
+                            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                          >
+                            Disconnect
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                ) : block.preview ? (
                   <>
                     {block.key === "person" && personMediaType === "video" ? (
                       <video src={block.preview} className="w-full h-full object-contain bg-slate-50" controls muted playsInline />
@@ -806,18 +1040,28 @@ export default function TryOnStudio({ user }) {
                     </button>
                   </>
                 ) : (
-                  <div className="h-full min-h-[170px] sm:min-h-[190px] flex items-center justify-center text-slate-500 text-sm">Click to upload</div>
+                  <div className="h-full min-h-[170px] sm:min-h-[190px] flex items-center justify-center text-slate-500 text-sm px-4 text-center">
+                    Click to upload
+                  </div>
                 )}
               </div>
               <div className="grid grid-cols-4 gap-2 mt-3">
                 {Array.from({ length: 8 }).map((_, idx) => {
                   const sample = block.samples[idx];
+                  const samplesDisabled = block.key === "person" && (personInputMode === "live" || personInputMode === "video");
                   return (
                     <button
                       key={`${block.key}-${idx}`}
                       type="button"
-                      className="aspect-square rounded-lg border border-slate-200 overflow-hidden bg-white"
-                      onClick={() => sample && useSample(block.key, sample)}
+                      title={samplesDisabled ? "Dataset samples are for Image mode" : undefined}
+                      disabled={samplesDisabled}
+                      className={`aspect-square rounded-lg border border-slate-200 overflow-hidden bg-white ${
+                        samplesDisabled ? "cursor-not-allowed opacity-40" : ""
+                      }`}
+                      onClick={() => {
+                        if (samplesDisabled) return;
+                        sample && useSample(block.key, sample);
+                      }}
                     >
                       {sample ? (
                         <img src={sample.url} alt={sample.fileName} className="w-full h-full object-contain bg-slate-50" />
