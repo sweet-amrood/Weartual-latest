@@ -101,7 +101,7 @@ export default function TryOnStudio({ user }) {
   const [liveCameraError, setLiveCameraError] = useState("");
   const liveVideoRef = useRef(null);
   /** Decart WebRTC session: camera input stream + realtime client (disconnect stops both). */
-  const decartSessionRef = useRef({ inputStream: null, realtimeClient: null });
+  const decartSessionRef = useRef({ inputStream: null, realtimeClient: null, disposeRotation: null });
   const [status, setStatus] = useState("idle");
   const [error, setError] = useState("");
   /** After first Generate, show centered output + loading/result. */
@@ -144,10 +144,10 @@ export default function TryOnStudio({ user }) {
   const garmentInputRef = useRef(null);
 
   const stopLiveCamera = useCallback(() => {
-    const { realtimeClient, inputStream } = decartSessionRef.current;
-    realtimeClient?.disconnect?.();
-    inputStream?.getTracks?.().forEach((t) => t.stop());
-    decartSessionRef.current = { inputStream: null, realtimeClient: null };
+    const session = decartSessionRef.current;
+    session?.disposeRotation?.();
+    session?.inputStream?.getTracks?.().forEach((t) => t.stop());
+    decartSessionRef.current = { inputStream: null, realtimeClient: null, disposeRotation: null };
     const v = liveVideoRef.current;
     if (v) v.srcObject = null;
     setLiveCameraActive(false);
@@ -168,9 +168,19 @@ export default function TryOnStudio({ user }) {
       setLiveCameraError("Camera is not supported in this browser.");
       return;
     }
+    setLiveCameraActive(true);
+    decartSessionRef.current = { inputStream: null, realtimeClient: null, disposeRotation: null };
     try {
-      const { inputStream, realtimeClient } = await connectDecartVirtualTryOn({
+      await connectDecartVirtualTryOn({
+        sessionRef: decartSessionRef,
         garmentFile,
+        onLocalStream: (localStream) => {
+          const el = liveVideoRef.current;
+          if (el) {
+            el.srcObject = localStream;
+            el.play().catch(() => {});
+          }
+        },
         onRemoteStream: (editedStream) => {
           const el = liveVideoRef.current;
           if (el) {
@@ -179,10 +189,14 @@ export default function TryOnStudio({ user }) {
           }
         }
       });
-      decartSessionRef.current = { inputStream, realtimeClient };
-      setLiveCameraActive(true);
     } catch (e) {
-      setLiveCameraError(String(e?.message || "Could not start Decart live try-on."));
+      stopLiveCamera();
+      const msg = String(e?.message || e || "Could not start Decart live try-on.");
+      setLiveCameraError(
+        /OverconstrainedError|NotAllowedError|NotFoundError/i.test(msg)
+          ? `${msg} If the camera never started, allow camera access or try another browser.`
+          : msg
+      );
     }
   }, [garmentFile, stopLiveCamera]);
 
@@ -963,8 +977,8 @@ export default function TryOnStudio({ user }) {
                   <div className="flex min-h-[170px] sm:min-h-[190px] flex-col items-center justify-center gap-3 bg-slate-50 p-4 text-center dark:bg-slate-800/50">
                     <video
                       ref={liveVideoRef}
-                      className={`max-h-[200px] w-full max-w-sm rounded-xl border border-slate-200 bg-black object-cover dark:border-slate-600 ${
-                        liveCameraActive ? "block" : "hidden"
+                      className={`max-h-[220px] w-full max-w-sm rounded-xl border border-slate-200 bg-black object-contain dark:border-slate-600 ${
+                        liveCameraActive ? "block min-h-[140px]" : "hidden"
                       }`}
                       playsInline
                       muted
