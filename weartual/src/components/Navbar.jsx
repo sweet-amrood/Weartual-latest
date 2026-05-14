@@ -260,14 +260,6 @@ export default function Navbar({ user, onLogout }) {
             </div>
 
             <div className="mt-4 border-t border-slate-200 dark:border-slate-600 pt-4 space-y-2">
-              <button
-                type="button"
-                onClick={toggleTheme}
-                className="w-full inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 dark:border-slate-600 px-4 py-2.5 text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800"
-              >
-                {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-                {theme === "dark" ? "Light mode" : "Dark mode"}
-              </button>
               {user ? (
                 <button
                   type="button"
