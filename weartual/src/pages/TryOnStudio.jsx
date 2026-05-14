@@ -7,6 +7,7 @@ import {
   Trash2,
   Download,
   Maximize2,
+  Minimize2,
   X,
   ArrowRight,
   ThumbsUp,
@@ -101,6 +102,9 @@ export default function TryOnStudio({ user }) {
   const [liveCameraActive, setLiveCameraActive] = useState(false);
   const [liveCameraError, setLiveCameraError] = useState("");
   const liveVideoRef = useRef(null);
+  /** Wrapper for browser fullscreen on the live try-on preview. */
+  const liveFeedFsRef = useRef(null);
+  const [isLiveFeedFullscreen, setIsLiveFeedFullscreen] = useState(false);
   /** Live try-on WebRTC session (camera stream + realtime client; dispose stops listeners). */
   const liveTryOnSessionRef = useRef({ inputStream: null, realtimeClient: null, disposeRotation: null });
   const [status, setStatus] = useState("idle");
@@ -145,6 +149,14 @@ export default function TryOnStudio({ user }) {
   const garmentInputRef = useRef(null);
 
   const stopLiveCamera = useCallback(() => {
+    const fsHost = liveFeedFsRef.current;
+    if (fsHost) {
+      const activeFs = document.fullscreenElement ?? document.webkitFullscreenElement;
+      if (activeFs === fsHost) {
+        if (document.exitFullscreen) void document.exitFullscreen().catch(() => {});
+        else if (document.webkitExitFullscreen) void document.webkitExitFullscreen();
+      }
+    }
     const session = liveTryOnSessionRef.current;
     session?.disposeRotation?.();
     session?.inputStream?.getTracks?.().forEach((t) => t.stop());
@@ -157,6 +169,37 @@ export default function TryOnStudio({ user }) {
   useEffect(() => {
     return () => stopLiveCamera();
   }, [stopLiveCamera]);
+
+  useEffect(() => {
+    const syncLiveFeedFs = () => {
+      const el = document.fullscreenElement ?? document.webkitFullscreenElement ?? null;
+      setIsLiveFeedFullscreen(el === liveFeedFsRef.current);
+    };
+    document.addEventListener("fullscreenchange", syncLiveFeedFs);
+    document.addEventListener("webkitfullscreenchange", syncLiveFeedFs);
+    return () => {
+      document.removeEventListener("fullscreenchange", syncLiveFeedFs);
+      document.removeEventListener("webkitfullscreenchange", syncLiveFeedFs);
+    };
+  }, []);
+
+  const toggleLiveFeedFullscreen = useCallback(async () => {
+    const node = liveFeedFsRef.current;
+    if (!node || !liveCameraActive) return;
+    try {
+      const current = document.fullscreenElement ?? document.webkitFullscreenElement;
+      if (current === node) {
+        if (document.exitFullscreen) await document.exitFullscreen();
+        else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+      } else if (node.requestFullscreen) {
+        await node.requestFullscreen();
+      } else if (node.webkitRequestFullscreen) {
+        node.webkitRequestFullscreen();
+      }
+    } catch {
+      /* requestFullscreen can reject (e.g. not allowed) */
+    }
+  }, [liveCameraActive]);
 
   const startLiveCamera = useCallback(async () => {
     setLiveCameraError("");
@@ -218,6 +261,10 @@ export default function TryOnStudio({ user }) {
   );
   const isProcessing = useMemo(() => status === "analyzing", [status]);
   const canRun = !!personPreview && !!garmentPreview && !isProcessing;
+  const liveFeedExpanded = useMemo(
+    () => personInputMode === "live" && liveCameraActive,
+    [personInputMode, liveCameraActive]
+  );
 
   useEffect(() => {
     fsZoomRef.current = fullscreenZoom;
@@ -809,7 +856,10 @@ export default function TryOnStudio({ user }) {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
-      <div id="tour-studio-root" className="max-w-6xl mx-auto px-4 py-12">
+      <div
+        id="tour-studio-root"
+        className={`mx-auto px-4 py-12 ${liveFeedExpanded ? "max-w-[88rem]" : "max-w-6xl"}`}
+      >
         <motion.div
           className="text-center mb-6 relative isolate overflow-hidden rounded-3xl border border-white/10 bg-[#050814] min-h-[300px] sm:min-h-[340px] flex items-center justify-center px-5 sm:px-6"
           initial={reduceMotion ? false : { opacity: 0, y: 18 }}
@@ -918,12 +968,29 @@ export default function TryOnStudio({ user }) {
           </div>
         )}
 
-        <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+        <div
+          className={
+            liveFeedExpanded
+              ? "flex w-full flex-col gap-5"
+              : "grid grid-cols-1 gap-5 lg:grid-cols-2"
+          }
+        >
           {[
             { key: "person", title: "Person input", preview: personPreview, ref: personInputRef, samples: personSamples },
             { key: "garment", title: "Garment Image", preview: garmentPreview, ref: garmentInputRef, samples: clothSamples }
           ].map((block) => (
-            <div key={block.key} className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
+            <div
+              key={block.key}
+              className={`rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900 ${
+                liveFeedExpanded && block.key === "person"
+                  ? "flex min-h-0 flex-col ring-2 ring-brand-500/15 shadow-lg shadow-slate-900/5 dark:ring-brand-400/20 dark:shadow-black/20"
+                  : ""
+              } ${
+                liveFeedExpanded && block.key === "garment"
+                  ? "mx-auto w-full max-w-5xl shrink-0 xl:max-w-6xl"
+                  : ""
+              }`}
+            >
               <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-500 mb-3">{block.title}</h3>
               {block.key === "person" && (
                 <div
@@ -955,7 +1022,11 @@ export default function TryOnStudio({ user }) {
                 </div>
               )}
               <div
-                className="relative rounded-2xl border border-slate-200 bg-slate-50 dark:border-slate-600 dark:bg-slate-800/50 min-h-[170px] sm:min-h-[190px] overflow-hidden"
+                className={`relative overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 dark:border-slate-600 dark:bg-slate-800/50 ${
+                  liveFeedExpanded && block.key === "person"
+                    ? "flex min-h-[280px] flex-1 flex-col sm:min-h-[380px] lg:min-h-[min(78vh,600px)]"
+                    : "min-h-[170px] sm:min-h-[190px]"
+                }`}
                 onClick={() =>
                   block.key === "person" && personInputMode === "live"
                     ? undefined
@@ -978,15 +1049,52 @@ export default function TryOnStudio({ user }) {
                   onChange={(e) => setPreview(block.key, e.target.files?.[0] || null)}
                 />
                 {block.key === "person" && personInputMode === "live" && !block.preview ? (
-                  <div className="flex min-h-[170px] sm:min-h-[190px] flex-col items-center justify-center gap-3 bg-slate-50 p-4 text-center dark:bg-slate-800/50">
-                    <video
-                      ref={liveVideoRef}
-                      className={`max-h-[220px] w-full max-w-sm rounded-xl border border-slate-200 bg-black object-contain dark:border-slate-600 ${
-                        liveCameraActive ? "block min-h-[140px]" : "hidden"
+                  <div
+                    className={`flex flex-col items-center bg-slate-50 p-4 text-center dark:bg-slate-800/50 ${
+                      liveFeedExpanded
+                        ? "min-h-[260px] flex-1 justify-between gap-4 py-6 sm:min-h-[360px] lg:min-h-[min(76vh,560px)]"
+                        : "min-h-[170px] justify-center gap-3 sm:min-h-[190px]"
+                    }`}
+                  >
+                    <div
+                      ref={liveFeedFsRef}
+                      className={`relative w-full min-h-0 ${
+                        liveCameraActive
+                          ? isLiveFeedFullscreen
+                            ? "flex flex-1 items-center justify-center bg-black"
+                            : liveFeedExpanded
+                              ? "flex flex-1 flex-col justify-center"
+                              : ""
+                          : ""
                       }`}
-                      playsInline
-                      muted
-                    />
+                    >
+                      <video
+                        ref={liveVideoRef}
+                        className={
+                          liveCameraActive
+                            ? isLiveFeedFullscreen
+                              ? "max-h-[100dvh] max-w-full object-contain"
+                              : "block h-auto w-full max-w-none rounded-xl border border-slate-200 bg-black object-contain dark:border-slate-600 max-h-[min(82vh,820px)] min-h-[200px] sm:min-h-[260px] lg:min-h-[min(58vh,540px)]"
+                            : "hidden max-h-[220px] w-full max-w-sm rounded-xl border border-slate-200 bg-black object-contain dark:border-slate-600"
+                        }
+                        playsInline
+                        muted
+                      />
+                      {liveCameraActive ? (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            void toggleLiveFeedFullscreen();
+                          }}
+                          className="absolute right-2 top-2 z-10 inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200/90 bg-white/95 text-slate-800 shadow-sm hover:bg-white dark:border-slate-600 dark:bg-slate-800/95 dark:text-slate-100 dark:hover:bg-slate-700"
+                          aria-label={isLiveFeedFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+                          title={isLiveFeedFullscreen ? "Exit fullscreen (Esc)" : "Fullscreen"}
+                        >
+                          {isLiveFeedFullscreen ? <Minimize2 className="h-4 w-4" aria-hidden /> : <Maximize2 className="h-4 w-4" aria-hidden />}
+                        </button>
+                      ) : null}
+                    </div>
                     {!liveCameraActive ? (
                       <p className="text-sm text-slate-500 dark:text-slate-400">
                         Add a garment image, then connect. The preview shows your live camera with the outfit applied.
@@ -1029,6 +1137,18 @@ export default function TryOnStudio({ user }) {
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation();
+                              void toggleLiveFeedFullscreen();
+                            }}
+                            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                            aria-pressed={isLiveFeedFullscreen}
+                          >
+                            {isLiveFeedFullscreen ? <Minimize2 className="h-4 w-4 shrink-0" aria-hidden /> : <Maximize2 className="h-4 w-4 shrink-0" aria-hidden />}
+                            {isLiveFeedFullscreen ? "Exit fullscreen" : "Fullscreen"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
                               stopLiveCamera();
                             }}
                             className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
@@ -1062,7 +1182,11 @@ export default function TryOnStudio({ user }) {
                   </div>
                 )}
               </div>
-              <div className="grid grid-cols-4 gap-2 mt-3">
+              <div
+                className={`mt-3 grid grid-cols-4 gap-2 ${
+                  liveFeedExpanded && block.key === "person" ? "hidden" : ""
+                }`}
+              >
                 {Array.from({ length: 8 }).map((_, idx) => {
                   const sample = block.samples[idx];
                   const samplesDisabled = block.key === "person" && (personInputMode === "live" || personInputMode === "video");
