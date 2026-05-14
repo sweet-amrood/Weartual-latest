@@ -1,3 +1,5 @@
+import { filterKeysNotInCooldown } from "./decartKeyCooldown.js";
+
 /**
  * Multiple Decart keys: use `DECART_API_KEYS` and/or `DECART_API_KEY` with values separated by
  * comma, space, semicolon, or pipe. Both variables are merged (de-duplicated).
@@ -26,6 +28,12 @@ const shuffleInPlace = (arr) => {
 export const getDecartApiKeysInRandomOrder = () => {
   const keys = parseDecartApiKeys();
   return shuffleInPlace([...keys]);
+};
+
+/** Same as random order, but skips keys in temporary cooldown after credit/quota failures. */
+export const getDecartApiKeysForTryOn = () => {
+  const keys = shuffleInPlace([...parseDecartApiKeys()]);
+  return filterKeysNotInCooldown(keys);
 };
 
 export const maskDecartApiKey = (key) => {

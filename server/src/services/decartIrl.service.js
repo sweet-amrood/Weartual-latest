@@ -5,7 +5,8 @@ import { accessSync, constants } from "fs";
 import { fileURLToPath } from "url";
 import AppError from "../utils/AppError.js";
 import { mergeDecartVendorPythonPath } from "../utils/decartPythonVendorEnv.js";
-import { getDecartApiKeysInRandomOrder, maskDecartApiKey } from "../utils/decartApiKeys.js";
+import { getDecartApiKeysForTryOn, maskDecartApiKey } from "../utils/decartApiKeys.js";
+import { isCreditLikeVendorFailure, markApiKeyCooldown } from "../utils/decartKeyCooldown.js";
 
 const DEFAULT_TIMEOUT_MS = 15 * 60 * 1000;
 const __filename = fileURLToPath(import.meta.url);
@@ -92,6 +93,8 @@ const runDecartIrlOnceWithKey = ({
       clearTimeout(timer);
       if (settled) return;
       if (code !== 0) {
+        const tail = (stderr || stdout).trim().slice(-4000);
+        if (isCreditLikeVendorFailure(tail)) markApiKeyCooldown(apiKey);
         finish(() =>
           reject(new AppError("We couldn’t generate your video try-on. Please try a different clip or try again later.", 502))
         );
@@ -117,7 +120,7 @@ export const runDecartIrlPipeline = async ({
   outputPath,
   timeoutMs = DEFAULT_TIMEOUT_MS
 }) => {
-  const keys = getDecartApiKeysInRandomOrder();
+  const keys = getDecartApiKeysForTryOn();
   if (!keys.length) {
     throw new AppError("Try-on is not available right now. Please try again later.", 500);
   }

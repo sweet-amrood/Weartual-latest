@@ -1,7 +1,8 @@
 import { createDecartClient } from "@decartai/sdk";
 import asyncHandler from "../utils/asyncHandler.js";
 import AppError from "../utils/AppError.js";
-import { getDecartApiKeysInRandomOrder, maskDecartApiKey } from "../utils/decartApiKeys.js";
+import { getDecartApiKeysForTryOn, maskDecartApiKey } from "../utils/decartApiKeys.js";
+import { isCreditLikeVendorFailure, markApiKeyCooldown } from "../utils/decartKeyCooldown.js";
 
 const parseAllowedOrigins = () => {
   const raw = [process.env.DECART_REALTIME_ALLOWED_ORIGINS, process.env.CLIENT_URL].filter(Boolean).join(",");
@@ -22,11 +23,11 @@ const parseAllowedOrigins = () => {
 };
 
 /**
- * Short-lived Decart client token for browser WebRTC (live virtual try-on).
- * Requires auth. Tries each configured API key (random order) until `tokens.create` succeeds.
+ * Short-lived client token for browser WebRTC (live virtual try-on).
+ * Requires auth. Tries each configured key (random order, cooldown-aware) until `tokens.create` succeeds.
  */
 export const createRealtimeToken = asyncHandler(async (_req, res) => {
-  const keys = getDecartApiKeysInRandomOrder();
+  const keys = getDecartApiKeysForTryOn();
   if (!keys.length) {
     return res.status(503).json({ message: "Live try-on is not available right now. Please try again later." });
   }
@@ -51,6 +52,7 @@ export const createRealtimeToken = asyncHandler(async (_req, res) => {
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       console.warn(`[decart-realtime-token] fail attempt ${i + 1}/${keys.length} key=${maskDecartApiKey(apiKey)}: ${msg.slice(0, 400)}`);
+      if (isCreditLikeVendorFailure(msg)) markApiKeyCooldown(apiKey);
     }
   }
 
