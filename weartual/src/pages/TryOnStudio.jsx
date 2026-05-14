@@ -36,6 +36,7 @@ import {
   removeOutfitRatingByOutfitId,
   saveOutfitRating
 } from "../services/outfitHistory";
+import { sanitizePublicErrorMessage } from "../lib/publicErrorMessage";
 import { connectDecartVirtualTryOn } from "../services/decartRealtime";
 
 const PERSON_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
@@ -100,8 +101,8 @@ export default function TryOnStudio({ user }) {
   const [liveCameraActive, setLiveCameraActive] = useState(false);
   const [liveCameraError, setLiveCameraError] = useState("");
   const liveVideoRef = useRef(null);
-  /** Decart WebRTC session: camera input stream + realtime client (disconnect stops both). */
-  const decartSessionRef = useRef({ inputStream: null, realtimeClient: null, disposeRotation: null });
+  /** Live try-on WebRTC session (camera stream + realtime client; dispose stops listeners). */
+  const liveTryOnSessionRef = useRef({ inputStream: null, realtimeClient: null, disposeRotation: null });
   const [status, setStatus] = useState("idle");
   const [error, setError] = useState("");
   /** After first Generate, show centered output + loading/result. */
@@ -144,10 +145,10 @@ export default function TryOnStudio({ user }) {
   const garmentInputRef = useRef(null);
 
   const stopLiveCamera = useCallback(() => {
-    const session = decartSessionRef.current;
+    const session = liveTryOnSessionRef.current;
     session?.disposeRotation?.();
     session?.inputStream?.getTracks?.().forEach((t) => t.stop());
-    decartSessionRef.current = { inputStream: null, realtimeClient: null, disposeRotation: null };
+    liveTryOnSessionRef.current = { inputStream: null, realtimeClient: null, disposeRotation: null };
     const v = liveVideoRef.current;
     if (v) v.srcObject = null;
     setLiveCameraActive(false);
@@ -169,10 +170,10 @@ export default function TryOnStudio({ user }) {
       return;
     }
     setLiveCameraActive(true);
-    decartSessionRef.current = { inputStream: null, realtimeClient: null, disposeRotation: null };
+    liveTryOnSessionRef.current = { inputStream: null, realtimeClient: null, disposeRotation: null };
     try {
       await connectDecartVirtualTryOn({
-        sessionRef: decartSessionRef,
+        sessionRef: liveTryOnSessionRef,
         garmentFile,
         onLocalStream: (localStream) => {
           const el = liveVideoRef.current;
@@ -191,9 +192,10 @@ export default function TryOnStudio({ user }) {
       });
     } catch (e) {
       stopLiveCamera();
-      const msg = String(e?.message || e || "Could not start Decart live try-on.");
+      const raw = String(e?.message || e || "Could not start live try-on.");
+      const msg = sanitizePublicErrorMessage(raw);
       setLiveCameraError(
-        /OverconstrainedError|NotAllowedError|NotFoundError/i.test(msg)
+        /OverconstrainedError|NotAllowedError|NotFoundError/i.test(raw)
           ? `${msg} If the camera never started, allow camera access or try another browser.`
           : msg
       );
@@ -662,7 +664,9 @@ export default function TryOnStudio({ user }) {
       const authLike =
         /please create an account or log in/i.test(msg) ||
         /authentication required|invalid or expired token|unauthorized|^401\b/i.test(msg);
-      setError(authLike ? "Please create an account or log in to use try-on generation." : msg || "Try-on generation failed.");
+      setError(
+        authLike ? "Please create an account or log in to use try-on generation." : sanitizePublicErrorMessage(msg || "Try-on generation failed.")
+      );
     }
   };
 
@@ -712,7 +716,7 @@ export default function TryOnStudio({ user }) {
       setRatingLocked(false);
       setShareFeedback("");
     } catch (err) {
-      setError(err?.message || "Could not delete this result from the server.");
+      setError(sanitizePublicErrorMessage(err?.message || "Could not delete this result from the server."));
     }
   };
 
@@ -985,8 +989,7 @@ export default function TryOnStudio({ user }) {
                     />
                     {!liveCameraActive ? (
                       <p className="text-sm text-slate-500 dark:text-slate-400">
-                        Decart live virtual try-on (Lucy VTON): add a garment, then connect. The preview is the
-                        transformed camera stream.
+                        Add a garment image, then connect. The preview shows your live camera with the outfit applied.
                       </p>
                     ) : (
                       <p className="text-xs text-slate-500 dark:text-slate-400">

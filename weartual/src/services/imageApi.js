@@ -1,4 +1,5 @@
 import { API_URL } from "../config/api";
+import { sanitizePublicErrorMessage } from "../lib/publicErrorMessage";
 
 const requestJson = async (path, options = {}) => {
   const response = await fetch(`${API_URL}${path}`, {
@@ -6,7 +7,7 @@ const requestJson = async (path, options = {}) => {
     ...options
   });
   const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.message || "Request failed");
+  if (!response.ok) throw new Error(sanitizePublicErrorMessage(data.message || "Request failed"));
   return data;
 };
 
@@ -38,7 +39,7 @@ export const uploadMyImage = async ({ imageFile, garmentFile }) => {
     if (response.status === 401) {
       throw new Error("Please create an account or log in to use try-on generation.");
     }
-    throw new Error(data.message || "Request failed");
+    throw new Error(sanitizePublicErrorMessage(data.message || "Request failed"));
   }
   return data;
 };

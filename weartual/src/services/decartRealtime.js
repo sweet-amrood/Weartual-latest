@@ -1,5 +1,6 @@
 import { createDecartClient, models } from "@decartai/sdk";
 import { API_URL } from "../config/api";
+import { sanitizePublicErrorMessage } from "../lib/publicErrorMessage";
 
 const DEFAULT_MODEL = import.meta.env.VITE_DECART_REALTIME_MODEL || "lucy-vton-2";
 
@@ -66,10 +67,10 @@ export async function resolveDecartRealtimeApiKey() {
     if (vite) {
       return { apiKey: vite, modelId: DEFAULT_MODEL };
     }
-    throw new Error(data.message || `Could not start Decart session (${res.status}). Sign in or configure Decart on the server.`);
+    throw new Error(sanitizePublicErrorMessage(data.message || "Could not start a live session. Please sign in and try again."));
   }
   const apiKey = data.apiKey;
-  if (!apiKey) throw new Error("Invalid Decart token response from server.");
+  if (!apiKey) throw new Error("Live session could not be started. Please try again.");
   const modelId = typeof data.modelId === "string" && data.modelId.trim() ? data.modelId.trim() : DEFAULT_MODEL;
   return { apiKey, modelId };
 }
@@ -266,5 +267,5 @@ export async function connectDecartVirtualTryOn({ sessionRef, garmentFile, onRem
 
   disconnectRealtimeOnly();
   stream.getTracks().forEach((t) => t.stop());
-  throw lastInitialErr ?? new Error("Decart live try-on: all API key attempts failed.");
+  throw new Error(sanitizePublicErrorMessage(lastInitialErr?.message || "Live try-on could not be started. Please try again."));
 }

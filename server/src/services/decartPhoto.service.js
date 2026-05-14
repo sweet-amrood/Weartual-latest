@@ -73,7 +73,7 @@ const runDecartPhotoOnceWithKey = ({
 
     const timer = setTimeout(() => {
       child.kill("SIGTERM");
-      finish(() => reject(new AppError("Decart image pipeline timed out.", 504)));
+      finish(() => reject(new AppError("Your try-on is taking too long. Please try again with smaller images.", 504)));
     }, timeoutMs);
 
     child.stdout?.on("data", (chunk) => {
@@ -85,23 +85,22 @@ const runDecartPhotoOnceWithKey = ({
 
     child.on("error", (err) => {
       clearTimeout(timer);
-      finish(() => reject(new AppError(`Failed to start Python: ${err.message}`, 500)));
+      finish(() => reject(new AppError("The try-on step could not be started. Please try again.", 500)));
     });
 
     child.on("close", async (code) => {
       clearTimeout(timer);
       if (settled) return;
       if (code !== 0) {
-        const tail = (stderr || stdout).trim().slice(-2000);
         finish(() =>
-          reject(new AppError(tail ? `Decart image failed: ${tail}` : `Decart image exited with code ${code}`, 502))
+          reject(new AppError("We couldn’t generate your try-on. Please try different photos or try again later.", 502))
         );
         return;
       }
       try {
         await fs.access(absOut);
       } catch {
-        finish(() => reject(new AppError("Decart image finished but output file is missing.", 502)));
+        finish(() => reject(new AppError("Your try-on finished but the result was unavailable. Please try again.", 502)));
         return;
       }
       finish(() => resolve({ outputPath: absOut }));
@@ -120,15 +119,12 @@ export const runDecartPhotoPipeline = async ({
 }) => {
   const keys = getDecartApiKeysInRandomOrder();
   if (!keys.length) {
-    throw new AppError(
-      "No Decart API keys configured. Set DECART_API_KEY and/or DECART_API_KEYS (comma-separated).",
-      500
-    );
+    throw new AppError("Try-on is not available right now. Please try again later.", 500);
   }
 
   const resolved = resolveScriptPath(process.env.DECART_PHOTO_SCRIPT, DEFAULT_PHOTO_SCRIPT_PATH);
   if (typeof resolved !== "string") {
-    throw new AppError(`Decart photo script cannot be read. Tried: ${resolved.attempted.join(" | ")}`, 500);
+    throw new AppError("Try-on is temporarily unavailable. Please try again later.", 500);
   }
   const scriptPath = resolved;
 
@@ -163,8 +159,5 @@ export const runDecartPhotoPipeline = async ({
     lastError instanceof AppError && typeof lastError.statusCode === "number" && lastError.statusCode >= 400
       ? lastError.statusCode
       : 502;
-  throw new AppError(
-    `All ${keys.length} Decart API key(s) failed for image try-on. Last error: ${lastError?.message || "unknown"}`,
-    code
-  );
+  throw new AppError("We couldn’t generate your try-on. Please try again in a few minutes.", code);
 };

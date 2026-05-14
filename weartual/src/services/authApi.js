@@ -1,4 +1,5 @@
 import { API_URL } from "../config/api";
+import { sanitizePublicErrorMessage } from "../lib/publicErrorMessage";
 
 const request = async (path, options = {}) => {
   const response = await fetch(`${API_URL}${path}`, {
@@ -12,7 +13,7 @@ const request = async (path, options = {}) => {
 
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new Error(data.message || "Request failed");
+    throw new Error(sanitizePublicErrorMessage(data.message || "Request failed"));
   }
 
   return data;

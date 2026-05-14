@@ -297,7 +297,7 @@ export const uploadImageService = async ({ userId, imageFile, garmentFile }) => 
     const garmentUrl = garmentUpload?.secure_url;
 
     if (!imageUrl || !garmentUrl) {
-      throw new AppError("Cloudinary upload failed to return secure URLs", 500);
+      throw new AppError("Upload could not be completed. Please try again.", 500);
     }
 
     console.info("[images] Uploaded to Cloudinary", {
@@ -345,11 +345,8 @@ export const uploadImageService = async ({ userId, imageFile, garmentFile }) => 
       const resultUpload = await uploadBufferToCloudinaryVideo(resultBuffer, "uploads/result", resultFilename);
 
       if (!resultUpload?.secure_url) {
-        throw new AppError("Cloudinary result upload failed to return secure URL", 500);
+        throw new AppError("Your result could not be saved. Please try again.", 500);
       }
-
-      resultUrl = resultUpload.secure_url;
-      resultType = "video";
     } else {
       await fs.mkdir(RESULT_DIR, { recursive: true });
       const personDiskPath = path.join(UPLOADS_DIR, "image", imageName);
@@ -374,7 +371,7 @@ export const uploadImageService = async ({ userId, imageFile, garmentFile }) => 
       const resultUpload = await uploadBufferToCloudinary(resultBuffer, "uploads/result", resultFilename);
 
       if (!resultUpload?.secure_url) {
-        throw new AppError("Cloudinary result upload failed to return secure URL", 500);
+        throw new AppError("Your result could not be saved. Please try again.", 500);
       }
 
       resultUrl = resultUpload.secure_url;
@@ -408,7 +405,7 @@ export const uploadImageService = async ({ userId, imageFile, garmentFile }) => 
   } catch (error) {
     if (error instanceof AppError) throw error;
     console.error("[images][cloudinary] Upload pipeline failed:", error?.message || error);
-    throw new AppError("Cloudinary upload failed", 502);
+    throw new AppError("Upload could not be completed. Please try again.", 502);
   }
 };
 

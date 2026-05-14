@@ -28,7 +28,7 @@ const parseAllowedOrigins = () => {
 export const createRealtimeToken = asyncHandler(async (_req, res) => {
   const keys = getDecartApiKeysInRandomOrder();
   if (!keys.length) {
-    return res.status(503).json({ message: "Decart API is not configured on the server." });
+    return res.status(503).json({ message: "Live try-on is not available right now. Please try again later." });
   }
 
   const modelId = (process.env.DECART_REALTIME_MODEL || "lucy-vton-2").trim();
@@ -41,7 +41,6 @@ export const createRealtimeToken = asyncHandler(async (_req, res) => {
     ...(origins.length ? { allowedOrigins: origins } : {})
   };
 
-  let lastError = null;
   for (let i = 0; i < keys.length; i += 1) {
     const apiKey = keys[i];
     try {
@@ -52,12 +51,8 @@ export const createRealtimeToken = asyncHandler(async (_req, res) => {
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       console.warn(`[decart-realtime-token] fail attempt ${i + 1}/${keys.length} key=${maskDecartApiKey(apiKey)}: ${msg.slice(0, 400)}`);
-      lastError = err instanceof Error ? err : new Error(msg);
     }
   }
 
-  throw new AppError(
-    `All ${keys.length} Decart API key(s) failed to create a realtime token. Last: ${lastError?.message || "unknown"}`,
-    503
-  );
+  throw new AppError("We couldn’t start a live session. Please try again later.", 503);
 });
