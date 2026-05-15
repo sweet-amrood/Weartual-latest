@@ -4,12 +4,34 @@ import { sanitizePublicErrorMessage } from "../lib/publicErrorMessage";
 
 const DEFAULT_MODEL = import.meta.env.VITE_DECART_REALTIME_MODEL || "lucy-vton-2";
 
+/**
+ * Pre-flip camera input before sending to Decart so server-baked overlays/watermarks
+ * align with display orientation. See Decart JS Realtime docs → Front-camera mirroring.
+ * @type {boolean | "auto"}
+ */
+const LIVE_MIRROR =
+  import.meta.env.VITE_DECART_LIVE_MIRROR === "true"
+    ? true
+    : import.meta.env.VITE_DECART_LIVE_MIRROR === "false"
+      ? false
+      : "auto";
+
 /** Default prompt for Lucy VTON realtime garment transfer. */
 export const LIVE_VTON_PROMPT =
   import.meta.env.VITE_DECART_VTON_PROMPT ||
   "Virtual try-on: realistically dress the person in the reference garment. Preserve identity, pose, and lighting where possible.";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/** Human-readable duration from Decart generation seconds or wall-clock fallback. */
+export function formatLiveSessionDuration(seconds) {
+  const s = Math.max(0, Math.floor(Number(seconds) || 0));
+  if (s < 60) return `${s} second${s === 1 ? "" : "s"}`;
+  const m = Math.floor(s / 60);
+  const r = s % 60;
+  if (r === 0) return `${m} minute${m === 1 ? "" : "s"}`;
+  return `${m} minute${m === 1 ? "" : "s"} ${r} second${r === 1 ? "" : "s"}`;
+}
 
 const MAX_TOKEN_CONNECT_ATTEMPTS = Math.min(
   16,
@@ -81,6 +103,7 @@ async function connectAndSetWithToken(stream, garmentFile, modelIdOverride, onRe
   const client = createDecartClient({ apiKey });
   const realtimeClient = await client.realtime.connect(stream, {
     model,
+    mirror: LIVE_MIRROR,
     onRemoteStream
   });
   await realtimeClient.set({
@@ -101,10 +124,20 @@ async function connectAndSetWithToken(stream, garmentFile, modelIdOverride, onRe
  * @param {File} opts.garmentFile
  * @param {(stream: MediaStream) => void} [opts.onRemoteStream]
  * @param {(stream: MediaStream) => void} [opts.onLocalStream]
+ * @param {(data: { seconds: number; totalSeconds: number }) => void} [opts.onGenerationTick]
+ * @param {(data: { generationSeconds: number; wallSeconds: number }) => void} [opts.onSessionEnd]
  * @param {string} [opts.modelId]
  * @returns {{ inputStream: MediaStream, disposeRotation: () => void }}
  */
-export async function connectDecartVirtualTryOn({ sessionRef, garmentFile, onRemoteStream, onLocalStream, modelId: modelIdOpt }) {
+export async function connectDecartVirtualTryOn({
+  sessionRef,
+  garmentFile,
+  onRemoteStream,
+  onLocalStream,
+  onGenerationTick,
+  onSessionEnd,
+  modelId: modelIdOpt
+}) {
   const modelIdFinal = modelIdOpt || DEFAULT_MODEL;
   const model = models.realtime(modelIdFinal);
 
@@ -141,8 +174,27 @@ export async function connectDecartVirtualTryOn({ sessionRef, garmentFile, onRem
 
   let disposed = false;
   let midSessionRotations = 0;
+  let accumulatedGenerationSeconds = 0;
+  let currentConnectionSeconds = 0;
+  const sessionStartedAt = Date.now();
   /** @type {(() => void)[]} */
   const listenerCleanups = [];
+
+  const flushGenerationToAccumulated = () => {
+    accumulatedGenerationSeconds += currentConnectionSeconds;
+    currentConnectionSeconds = 0;
+  };
+
+  const getTotalGenerationSeconds = () => accumulatedGenerationSeconds + currentConnectionSeconds;
+
+  const emitSessionEnd = () => {
+    const generationSeconds = getTotalGenerationSeconds();
+    const wallSeconds = Math.max(0, Math.round((Date.now() - sessionStartedAt) / 1000));
+    onSessionEnd?.({
+      generationSeconds,
+      wallSeconds
+    });
+  };
 
   const clearListeners = () => {
     while (listenerCleanups.length) {
@@ -167,6 +219,22 @@ export async function connectDecartVirtualTryOn({ sessionRef, garmentFile, onRem
 
   const attachRtc = (rtc, scheduleRotateFn) => {
     sessionRef.current.realtimeClient = rtc;
+    const tickHandler = ({ seconds }) => {
+      if (disposed) return;
+      currentConnectionSeconds = Math.max(currentConnectionSeconds, Number(seconds) || 0);
+      onGenerationTick?.({
+        seconds: currentConnectionSeconds,
+        totalSeconds: getTotalGenerationSeconds()
+      });
+    };
+    rtc.on?.("generationTick", tickHandler);
+    listenerCleanups.push(() => {
+      try {
+        rtc.off?.("generationTick", tickHandler);
+      } catch {
+        // ignore
+      }
+    });
     const errorHandler = (e) => {
       if (disposed) return;
       if (!isDecartQuotaOrCreditError(e)) return;
@@ -195,6 +263,7 @@ export async function connectDecartVirtualTryOn({ sessionRef, garmentFile, onRem
           return;
         }
         midSessionRotations += 1;
+        flushGenerationToAccumulated();
         disconnectRealtimeOnly();
 
         let lastErr;
@@ -248,7 +317,9 @@ export async function connectDecartVirtualTryOn({ sessionRef, garmentFile, onRem
       attachRtc(rtc, scheduleRotate);
 
       const disposeRotation = () => {
+        if (disposed) return;
         disposed = true;
+        emitSessionEnd();
         disconnectRealtimeOnly();
       };
       sessionRef.current.disposeRotation = disposeRotation;

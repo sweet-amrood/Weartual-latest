@@ -38,7 +38,7 @@ import {
   saveOutfitRating
 } from "../services/outfitHistory";
 import { sanitizePublicErrorMessage } from "../lib/publicErrorMessage";
-import { connectDecartVirtualTryOn } from "../services/decartRealtime";
+import { connectDecartVirtualTryOn, formatLiveSessionDuration } from "../services/decartRealtime";
 
 const PERSON_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const PERSON_VIDEO_TYPES = ["video/mp4", "video/webm", "video/quicktime"];
@@ -101,6 +101,10 @@ export default function TryOnStudio({ user }) {
   const [personInputMode, setPersonInputMode] = useState("image");
   const [liveCameraActive, setLiveCameraActive] = useState(false);
   const [liveCameraError, setLiveCameraError] = useState("");
+  /** Decart generationTick total (billing-oriented seconds while connected). */
+  const [liveGenerationSeconds, setLiveGenerationSeconds] = useState(0);
+  /** Shown after disconnect with how long the live session ran. */
+  const [liveSessionSummary, setLiveSessionSummary] = useState("");
   const liveVideoRef = useRef(null);
   /** Wrapper for browser fullscreen on the live try-on preview. */
   const liveFeedFsRef = useRef(null);
@@ -204,6 +208,8 @@ export default function TryOnStudio({ user }) {
   const startLiveCamera = useCallback(async () => {
     setLiveCameraError("");
     stopLiveCamera();
+    setLiveSessionSummary("");
+    setLiveGenerationSeconds(0);
     if (!garmentFile) {
       setLiveCameraError("Add a garment image first — live try-on needs a reference outfit.");
       return;
@@ -231,6 +237,16 @@ export default function TryOnStudio({ user }) {
             el.srcObject = editedStream;
             el.play().catch(() => {});
           }
+        },
+        onGenerationTick: ({ totalSeconds }) => {
+          setLiveGenerationSeconds(totalSeconds);
+        },
+        onSessionEnd: ({ generationSeconds, wallSeconds }) => {
+          const durationSec = generationSeconds > 0 ? generationSeconds : wallSeconds;
+          setLiveGenerationSeconds(0);
+          if (durationSec > 0) {
+            setLiveSessionSummary(`Live try-on ended · ${formatLiveSessionDuration(durationSec)}`);
+          }
         }
       });
     } catch (e) {
@@ -250,6 +266,7 @@ export default function TryOnStudio({ user }) {
       if (mode === personInputMode) return;
       stopLiveCamera();
       setLiveCameraError("");
+      setLiveSessionSummary("");
       if (personPreview) URL.revokeObjectURL(personPreview);
       setPersonPreview(null);
       setPersonFile(null);
@@ -1097,12 +1114,19 @@ export default function TryOnStudio({ user }) {
                     </div>
                     {!liveCameraActive ? (
                       <p className="text-sm text-slate-500 dark:text-slate-400">
-                        Add a garment image, then connect. The preview shows your live camera with the outfit applied.
+                        {liveSessionSummary || "Add a garment image, then connect. The preview shows your live camera with the outfit applied."}
                       </p>
                     ) : (
-                      <p className="text-xs text-slate-500 dark:text-slate-400">
-                        Tip: capture a frame if you also want to run offline Generate with the same look.
-                      </p>
+                      <div className="flex flex-col items-center gap-1">
+                        {liveGenerationSeconds > 0 ? (
+                          <p className="text-xs font-medium text-brand-700 dark:text-brand-300">
+                            Live session · {formatLiveSessionDuration(liveGenerationSeconds)}
+                          </p>
+                        ) : null}
+                        <p className="text-xs text-slate-500 dark:text-slate-400">
+                          Tip: capture a frame if you also want to run offline Generate with the same look.
+                        </p>
+                      </div>
                     )}
                     {liveCameraError ? (
                       <p className="text-xs text-rose-600 dark:text-rose-400">{liveCameraError}</p>
