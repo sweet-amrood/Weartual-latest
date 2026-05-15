@@ -7,7 +7,6 @@ import {
   Copy,
   Download,
   ImageIcon,
-  Link2,
   Loader2,
   Share2,
   Sparkles,
@@ -136,16 +135,6 @@ function WhatsAppIcon({ className }) {
   );
 }
 
-/** Link + copy affordance for “copy outfit URL”. */
-function LinkCopyIcon({ className }) {
-  return (
-    <span className={`inline-flex items-center gap-0.5 ${className || ""}`} aria-hidden>
-      <Link2 className="h-5 w-5 shrink-0" strokeWidth={2} />
-      <Copy className="h-3.5 w-3.5 shrink-0 opacity-90" strokeWidth={2.5} />
-    </span>
-  );
-}
-
 async function cardNodeToPngFile(node, filename) {
   const dataUrl = await toPng(node, {
     cacheBust: true,
@@ -239,12 +228,17 @@ export default function FashionShareCardsSection({ username }) {
     if (!el) return;
     const update = () => {
       const w = el.getBoundingClientRect().width;
-      setPreviewScale(Math.min(1, Math.max(0.24, w / CARD_W)));
+      if (w <= 0) return;
+      setPreviewScale(Math.min(1, Math.max(0.2, w / CARD_W)));
     };
     update();
     const ro = new ResizeObserver(update);
     ro.observe(el);
-    return () => ro.disconnect();
+    window.addEventListener("resize", update);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", update);
+    };
   }, [jobs.length]);
 
   const safeUsername = username || "stylist";
@@ -457,7 +451,7 @@ export default function FashionShareCardsSection({ username }) {
       id: "copylink",
       label: "Copy link",
       onClick: handleCopyOutfitLink,
-      icon: LinkCopyIcon,
+      icon: Copy,
       className:
         "border border-slate-200 bg-slate-50 text-slate-800 hover:bg-white hover:border-brand-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:border-brand-500",
       requireCardReady: false
@@ -465,7 +459,7 @@ export default function FashionShareCardsSection({ username }) {
   ];
 
   return (
-    <section className="animate-share-card-section rounded-2xl border border-slate-200 bg-white p-6 shadow-sm mb-6 dark:border-slate-700 dark:bg-slate-900 overflow-hidden">
+    <section className="animate-share-card-section mb-6 box-border min-w-0 w-full max-w-full overflow-x-hidden rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900 sm:p-6">
       <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-300 mb-1 flex items-center gap-2">
@@ -514,66 +508,63 @@ export default function FashionShareCardsSection({ username }) {
             </div>
           </div>
 
-          <div className="mx-auto mb-6 flex w-full max-w-full items-center justify-center gap-1 sm:gap-2">
-            <button
-              type="button"
-              onClick={goNewer}
-              disabled={!canGoNewer}
-              aria-label="Newer look"
-              title="Newer look"
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-800 shadow-sm transition-all duration-200 hover:border-brand-300 hover:bg-brand-50 hover:text-brand-800 active:scale-95 disabled:pointer-events-none disabled:opacity-30 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:border-brand-500 dark:hover:bg-slate-700"
-            >
-              <ChevronLeft className="h-6 w-6" aria-hidden />
-            </button>
-
-            <div
-              ref={previewWrapRef}
-              className="relative min-w-0 flex-1 transition-[box-shadow] duration-500 ease-out"
-            >
-              <div
-                className="mx-auto overflow-hidden rounded-2xl shadow-2xl shadow-violet-900/20 ring-1 ring-white/10 transition-all duration-500 ease-out hover:shadow-violet-900/35 hover:ring-violet-300/30"
-                style={{
-                  width: CARD_W * previewScale,
-                  height: CARD_H * previewScale
-                }}
+          <div className="mb-4 w-full min-w-0 sm:mb-6">
+            <div ref={previewWrapRef} className="mx-auto w-full min-w-0 max-w-full sm:max-w-md">
+              <motion.div
+                className="relative mx-auto w-full min-w-0 overflow-hidden rounded-2xl shadow-2xl shadow-violet-900/20 ring-1 ring-white/10 transition-[box-shadow] duration-500 ease-out hover:shadow-violet-900/35 hover:ring-violet-300/30"
+                style={{ aspectRatio: `${CARD_W} / ${CARD_H}` }}
               >
-                <AnimatePresence mode="wait">
-                  <motion.div
-                    key={`${lookIndex}-${imageUrl || "none"}`}
-                    className="origin-top-left"
-                    style={{
-                      transform: `scale(${previewScale})`,
-                      transformOrigin: "top left"
-                    }}
-                    initial={reduceMotion ? false : { opacity: 0.45 }}
-                    animate={{
-                      opacity: imageReady ? 1 : 0.88
-                    }}
-                    exit={reduceMotion ? undefined : { opacity: 0 }}
-                    transition={reduceMotion ? { duration: 0 } : { duration: 0.28, ease: easeOut }}
-                  >
-                    <FashionCardInterior
-                      imageUrl={imageUrl}
-                      username={safeUsername}
-                      logoSrc={logoSrc}
-                      onResultImageLoad={bumpImageReady}
-                      onResultImageError={bumpImageReady}
-                    />
-                  </motion.div>
-                </AnimatePresence>
-              </div>
+                <div
+                  className="absolute left-0 top-0 origin-top-left"
+                  style={{
+                    width: CARD_W,
+                    height: CARD_H,
+                    transform: `scale(${previewScale})`
+                  }}
+                >
+                  <AnimatePresence mode="wait">
+                    <motion.div
+                      key={`${lookIndex}-${imageUrl || "none"}`}
+                      initial={reduceMotion ? false : { opacity: 0.45 }}
+                      animate={{ opacity: imageReady ? 1 : 0.88 }}
+                      exit={reduceMotion ? undefined : { opacity: 0 }}
+                      transition={reduceMotion ? { duration: 0 } : { duration: 0.28, ease: easeOut }}
+                    >
+                      <FashionCardInterior
+                        imageUrl={imageUrl}
+                        username={safeUsername}
+                        logoSrc={logoSrc}
+                        onResultImageLoad={bumpImageReady}
+                        onResultImageError={bumpImageReady}
+                      />
+                    </motion.div>
+                  </AnimatePresence>
+                </div>
+              </motion.div>
             </div>
 
-            <button
-              type="button"
-              onClick={goOlder}
-              disabled={!canGoOlder}
-              aria-label="Older look"
-              title="Older look"
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-800 shadow-sm transition-all duration-200 hover:border-brand-300 hover:bg-brand-50 hover:text-brand-800 active:scale-95 disabled:pointer-events-none disabled:opacity-30 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:border-brand-500 dark:hover:bg-slate-700"
-            >
-              <ChevronRight className="h-6 w-6" aria-hidden />
-            </button>
+            <div className="mt-4 flex items-center justify-center gap-6 sm:gap-8">
+              <button
+                type="button"
+                onClick={goNewer}
+                disabled={!canGoNewer}
+                aria-label="Newer look"
+                title="Newer look"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-800 shadow-sm transition-all duration-200 hover:border-brand-300 hover:bg-brand-50 hover:text-brand-800 active:scale-95 disabled:pointer-events-none disabled:opacity-30 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:border-brand-500 dark:hover:bg-slate-700"
+              >
+                <ChevronLeft className="h-6 w-6" aria-hidden />
+              </button>
+              <button
+                type="button"
+                onClick={goOlder}
+                disabled={!canGoOlder}
+                aria-label="Older look"
+                title="Older look"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-800 shadow-sm transition-all duration-200 hover:border-brand-300 hover:bg-brand-50 hover:text-brand-800 active:scale-95 disabled:pointer-events-none disabled:opacity-30 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:border-brand-500 dark:hover:bg-slate-700"
+              >
+                <ChevronRight className="h-6 w-6" aria-hidden />
+              </button>
+            </div>
           </div>
 
           <p className="mb-2 text-center text-xs text-slate-500 dark:text-slate-400 tabular-nums">
@@ -587,14 +578,14 @@ export default function FashionShareCardsSection({ username }) {
 
       {!loadingLooks && jobs.length > 0 ? (
         <>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 mb-3">
+          <div className="mb-3 flex w-full min-w-0 max-w-full flex-col gap-2.5">
             <button
               type="button"
               onClick={handleDownload}
               disabled={exportBusy || !imageUrl || !imageReady}
-              className="col-span-2 sm:col-span-1 inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 px-4 py-3 text-sm font-semibold text-white shadow-md transition-all duration-200 hover:from-violet-500 hover:to-fuchsia-500 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none"
+              className="box-border inline-flex w-full max-w-full min-w-0 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 px-4 py-3 text-sm font-semibold text-white shadow-md transition-all duration-200 hover:from-violet-500 hover:to-fuchsia-500 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50"
             >
-              {exportBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+              {exportBusy ? <Loader2 className="w-4 h-4 animate-spin shrink-0" /> : <Download className="w-4 h-4 shrink-0" />}
               Download card
             </button>
             {"share" in navigator ? (
@@ -602,7 +593,7 @@ export default function FashionShareCardsSection({ username }) {
                 type="button"
                 onClick={handleNativeShare}
                 disabled={exportBusy || !imageUrl || !imageReady}
-                className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-800 transition-all duration-200 hover:bg-white hover:border-brand-300 active:scale-[0.98] dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:border-brand-500 disabled:opacity-50"
+                className="box-border inline-flex w-full max-w-full min-w-0 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-800 transition-all duration-200 hover:bg-white hover:border-brand-300 active:scale-[0.98] dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:border-brand-500 disabled:opacity-50"
               >
                 <MessageCircle className="w-4 h-4 shrink-0" />
                 Share…
@@ -611,7 +602,7 @@ export default function FashionShareCardsSection({ username }) {
           </div>
 
           <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-2">Share to</p>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+          <div className="grid min-w-0 grid-cols-2 gap-2.5 sm:grid-cols-3">
             {shareButtons.map(({ id, label, onClick, icon: Icon, className, requireCardReady = true }) => {
               const needsReady = requireCardReady && !imageReady;
               return (
@@ -620,9 +611,9 @@ export default function FashionShareCardsSection({ username }) {
                   type="button"
                   onClick={onClick}
                   disabled={exportBusy || !imageUrl || needsReady}
-                  className={`inline-flex items-center justify-center gap-2 rounded-xl px-3 py-3 text-sm font-semibold transition-all duration-200 active:scale-[0.97] disabled:opacity-45 disabled:pointer-events-none ${className}`}
+                  className={`inline-flex min-w-0 items-center justify-center gap-2 rounded-xl px-3 py-3 text-sm font-semibold transition-all duration-200 active:scale-[0.97] disabled:pointer-events-none disabled:opacity-45 ${className}`}
                 >
-                  {id === "copylink" ? <Icon /> : <Icon className="w-5 h-5 shrink-0" />}
+                  <Icon className="w-5 h-5 shrink-0" />
                   {label}
                 </button>
               );
