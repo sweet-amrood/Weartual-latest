@@ -8,15 +8,26 @@ import {
   Download,
   ImageIcon,
   Loader2,
+  Pause,
+  Play,
   Share2,
-  Sparkles,
-  MessageCircle
+  Sparkles
 } from "lucide-react";
 import { listMyImages } from "../services/imageApi";
 import { easeOut } from "../lib/motionPresets";
 
 const CARD_W = 1080;
 const CARD_H = 1350;
+
+const VIDEO_URL_RE = /\.(mp4|webm|mov|m4v)(\?|$)/i;
+
+const jobIsVideo = (job) => {
+  if (job?.resultType === "video") return true;
+  const url = String(job?.resultUrl || "");
+  if (VIDEO_URL_RE.test(url)) return true;
+  if (/\/video\/upload\//.test(url)) return true;
+  return false;
+};
 
 /** English possessive for card titles (e.g. "Mushi's Outfit of the Day"). */
 const possessiveName = (name) => {
@@ -27,9 +38,53 @@ const possessiveName = (name) => {
 };
 
 /** Inner card layout — rendered twice (preview scale + off-screen export). */
-function FashionCardInterior({ imageUrl, username, logoSrc, onResultImageLoad, onResultImageError }) {
+function FashionCardInterior({
+  imageUrl,
+  isVideo,
+  interactiveVideo = false,
+  username,
+  logoSrc,
+  onResultImageLoad,
+  onResultImageError
+}) {
   const title = `${possessiveName(username)} Outfit of the Day`;
   const handle = `@${String(username || "weartual").replace(/\s+/g, "")}`;
+  const videoRef = useRef(null);
+  const [videoPlaying, setVideoPlaying] = useState(false);
+
+  useEffect(() => {
+    setVideoPlaying(false);
+    const v = videoRef.current;
+    if (!v) return;
+    v.pause();
+    try {
+      v.currentTime = 0;
+    } catch {
+      /* ignore seek errors */
+    }
+  }, [imageUrl, isVideo]);
+
+  const toggleVideoPlayback = useCallback(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    if (v.paused) {
+      v.play()
+        .then(() => setVideoPlaying(true))
+        .catch(() => setVideoPlaying(false));
+    } else {
+      v.pause();
+      setVideoPlaying(false);
+    }
+  }, []);
+
+  const handleVideoLoaded = useCallback(() => {
+    const v = videoRef.current;
+    if (v) {
+      v.pause();
+      setVideoPlaying(false);
+    }
+    onResultImageLoad?.();
+  }, [onResultImageLoad]);
 
   return (
     <div
@@ -63,15 +118,51 @@ function FashionCardInterior({ imageUrl, username, logoSrc, onResultImageLoad, o
           style={{ minHeight: 720 }}
         >
           {imageUrl ? (
-            <img
-              src={imageUrl}
-              alt=""
-              crossOrigin="anonymous"
-              className="h-full min-h-[720px] w-full object-contain"
-              draggable={false}
-              onLoad={onResultImageLoad}
-              onError={onResultImageError}
-            />
+            isVideo ? (
+              <>
+                <video
+                  ref={videoRef}
+                  src={imageUrl}
+                  className="h-full min-h-[720px] w-full object-contain"
+                  muted
+                  playsInline
+                  loop={interactiveVideo}
+                  preload="metadata"
+                  crossOrigin="anonymous"
+                  onLoadedData={handleVideoLoaded}
+                  onPlay={() => setVideoPlaying(true)}
+                  onPause={() => setVideoPlaying(false)}
+                  onEnded={() => setVideoPlaying(false)}
+                  onError={onResultImageError}
+                />
+                {interactiveVideo ? (
+                  <button
+                    type="button"
+                    onClick={toggleVideoPlayback}
+                    className="absolute inset-0 z-20 flex items-center justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+                    aria-label={videoPlaying ? "Pause video" : "Play video"}
+                  >
+                    <span className="flex h-24 w-24 items-center justify-center rounded-full bg-black/55 text-white shadow-lg ring-2 ring-white/30 backdrop-blur-sm">
+                      {videoPlaying ? (
+                        <Pause className="h-11 w-11" fill="currentColor" strokeWidth={0} aria-hidden />
+                      ) : (
+                        <Play className="h-12 w-12 translate-x-0.5" fill="currentColor" strokeWidth={0} aria-hidden />
+                      )}
+                    </span>
+                  </button>
+                ) : null}
+              </>
+            ) : (
+              <img
+                src={imageUrl}
+                alt=""
+                crossOrigin="anonymous"
+                className="h-full min-h-[720px] w-full object-contain"
+                draggable={false}
+                onLoad={onResultImageLoad}
+                onError={onResultImageError}
+              />
+            )
           ) : (
             <div className="flex h-full min-h-[720px] w-full items-center justify-center bg-gradient-to-b from-violet-950/80 to-slate-950">
               <ImageIcon className="h-24 w-24 text-violet-400/40" strokeWidth={1} />
@@ -135,6 +226,14 @@ function WhatsAppIcon({ className }) {
   );
 }
 
+async function resultUrlToMediaFile(url, filename, fallbackType = "application/octet-stream") {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error("Could not fetch media from your look URL.");
+  const blob = await res.blob();
+  const type = blob.type || fallbackType;
+  return new File([blob], filename, { type });
+}
+
 async function cardNodeToPngFile(node, filename) {
   const dataUrl = await toPng(node, {
     cacheBust: true,
@@ -179,8 +278,8 @@ export default function FashionShareCardsSection({ username }) {
         const data = await listMyImages();
         if (cancelled) return;
         const arr = Array.isArray(data?.images) ? data.images : [];
-        const imageJobs = arr.filter((j) => j?.resultUrl && (j.resultType || "image") !== "video");
-        setJobs(imageJobs);
+        const withResults = arr.filter((j) => String(j?.resultUrl || "").trim().length > 0);
+        setJobs(withResults);
         setLookIndex(0);
       } catch (e) {
         if (!cancelled) setLooksError(e?.message || "Could not load your looks.");
@@ -199,6 +298,7 @@ export default function FashionShareCardsSection({ username }) {
     return jobs[i];
   }, [jobs, lookIndex]);
   const imageUrl = selected?.resultUrl || "";
+  const selectedIsVideo = selected ? jobIsVideo(selected) : false;
 
   const canGoNewer = lookIndex > 0;
   const canGoOlder = jobs.length > 0 && lookIndex < jobs.length - 1;
@@ -221,7 +321,7 @@ export default function FashionShareCardsSection({ username }) {
   useEffect(() => {
     setImageReady(false);
     setSocialHint("");
-  }, [imageUrl]);
+  }, [imageUrl, selectedIsVideo]);
 
   useEffect(() => {
     const el = previewWrapRef.current;
@@ -248,11 +348,15 @@ export default function FashionShareCardsSection({ username }) {
   }, []);
 
   const buildExportFile = useCallback(async () => {
+    const slug = String(safeUsername).replace(/[^\w-]+/g, "-");
+    if (selectedIsVideo) {
+      if (!imageUrl) throw new Error("Video not ready");
+      return resultUrlToMediaFile(imageUrl, `weartual-${slug}-outfit.mp4`, "video/mp4");
+    }
     const node = exportRef.current;
     if (!node) throw new Error("Card not ready");
-    const fname = `weartual-${String(safeUsername).replace(/[^\w-]+/g, "-")}-outfit-card.png`;
-    return cardNodeToPngFile(node, fname);
-  }, [safeUsername]);
+    return cardNodeToPngFile(node, `weartual-${slug}-outfit-card.png`);
+  }, [safeUsername, imageUrl, selectedIsVideo]);
 
   const saveFileToDownloads = useCallback((file) => {
     const url = URL.createObjectURL(file);
@@ -269,9 +373,18 @@ export default function FashionShareCardsSection({ username }) {
     try {
       const file = await buildExportFile();
       saveFileToDownloads(file);
-      setSocialHint("Saved to your downloads — ready for feeds and stories.");
+      setSocialHint(
+        selectedIsVideo
+          ? "Video saved to your downloads."
+          : "Saved to your downloads — ready for feeds and stories."
+      );
     } catch (e) {
-      setSocialHint(e?.message || "Could not export image. If this persists, the host image may block cross-origin capture.");
+      setSocialHint(
+        e?.message ||
+          (selectedIsVideo
+            ? "Could not download video. Try Copy link or open the look in Outfit History."
+            : "Could not export image. If this persists, the host image may block cross-origin capture.")
+      );
     } finally {
       setExportBusy(false);
     }
@@ -284,31 +397,6 @@ export default function FashionShareCardsSection({ username }) {
       return true;
     }
     return false;
-  };
-
-  const handleNativeShare = async () => {
-    setSocialHint("");
-    setExportBusy(true);
-    try {
-      const text = `My look from Weartual — virtual try-on ✨ ${window.location.origin}`;
-      const shared = await tryShareFile({ text, title: "Fashion card" });
-      if (!shared) {
-        const file = await buildExportFile();
-        saveFileToDownloads(file);
-        setSocialHint("System share not available — downloaded the card instead.");
-      }
-    } catch (e) {
-      if (e?.name === "AbortError") return;
-      try {
-        const file = await buildExportFile();
-        saveFileToDownloads(file);
-        setSocialHint("Downloaded the card as fallback.");
-      } catch (err) {
-        setSocialHint(err?.message || "Share failed.");
-      }
-    } finally {
-      setExportBusy(false);
-    }
   };
 
   const handleShareX = async () => {
@@ -337,7 +425,11 @@ export default function FashionShareCardsSection({ username }) {
     try {
       const shared = await tryShareFile({ title: "Share look" });
       if (shared) {
-        setSocialHint("Choose Instagram, TikTok, Snapchat, or Save Image from your share sheet.");
+        setSocialHint(
+          selectedIsVideo
+            ? "Choose Instagram, TikTok, Snapchat, or Save Video from your share sheet."
+            : "Choose Instagram, TikTok, Snapchat, or Save Image from your share sheet."
+        );
       } else {
         const file = await buildExportFile();
         saveFileToDownloads(file);
@@ -362,19 +454,25 @@ export default function FashionShareCardsSection({ username }) {
 
   const handleShareInstagram = () =>
     openAfterExport(
-      "Image saved. In Instagram, tap + → Post and pick the card from your gallery.",
+      selectedIsVideo
+        ? "Video saved. In Instagram, tap + → Reel/Story and pick the video from your gallery."
+        : "Image saved. In Instagram, tap + → Post and pick the card from your gallery.",
       "https://www.instagram.com/"
     );
 
   const handleShareTikTok = () =>
     openAfterExport(
-      "Image saved. In TikTok, tap + → Upload and select the card from your device.",
+      selectedIsVideo
+        ? "Video saved. In TikTok, tap + → Upload and select the video from your device."
+        : "Image saved. In TikTok, tap + → Upload and select the card from your device.",
       "https://www.tiktok.com/tiktokstudio/upload"
     );
 
   const handleShareSnapchat = () =>
     openAfterExport(
-      "Image saved. Open Snapchat and add the card from your camera roll or memories.",
+      selectedIsVideo
+        ? "Video saved. Open Snapchat and add the video from your camera roll or memories."
+        : "Image saved. Open Snapchat and add the card from your camera roll or memories.",
       "https://www.snapchat.com/"
     );
 
@@ -383,7 +481,11 @@ export default function FashionShareCardsSection({ username }) {
     setSocialHint("");
     try {
       await navigator.clipboard.writeText(imageUrl);
-      setSocialHint("Outfit image link copied — paste it in chat, email, or notes.");
+      setSocialHint(
+        selectedIsVideo
+          ? "Outfit video link copied — paste it in chat, email, or notes."
+          : "Outfit image link copied — paste it in chat, email, or notes."
+      );
     } catch {
       try {
         const ta = document.createElement("textarea");
@@ -466,9 +568,8 @@ export default function FashionShareCardsSection({ username }) {
             <Share2 className="w-4 h-4" /> Shareable fashion cards
           </h2>
           <p className="text-sm text-slate-600 dark:text-slate-400 max-w-xl leading-relaxed">
-            Turn a saved try-on into a polished 4:5 card with Weartual branding, your handle, and an editorial title. On mobile,
-            use platform buttons to open the system share sheet when available; otherwise the card downloads and the destination
-            site opens for quick posting.
+            Browse every saved try-on (photos and videos). Images export as a polished 4:5 card; videos download or share as
+            MP4 with the same branded preview frame.
           </p>
         </div>
       </div>
@@ -485,9 +586,9 @@ export default function FashionShareCardsSection({ username }) {
       ) : jobs.length === 0 ? (
         <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/80 px-4 py-10 text-center dark:border-slate-600 dark:bg-slate-800/50">
           <ImageIcon className="w-10 h-10 mx-auto text-slate-400 mb-3" strokeWidth={1.25} />
-          <p className="text-sm font-medium text-slate-700 dark:text-slate-200">No saved outfit images yet</p>
+          <p className="text-sm font-medium text-slate-700 dark:text-slate-200">No saved outfit results yet</p>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-sm mx-auto">
-            Generate a look in Try-On Studio — it will appear here for sharing.
+            Generate a photo or video look in Try-On Studio — it will appear here for sharing.
           </p>
         </div>
       ) : (
@@ -496,10 +597,12 @@ export default function FashionShareCardsSection({ username }) {
             Showing your latest look first. Use arrows to browse older try-ons.
           </p>
 
+          {!selectedIsVideo ? (
           <div className="fixed left-[-10000px] top-0 z-[-1] overflow-hidden opacity-0 pointer-events-none" aria-hidden>
             <div ref={exportRef}>
               <FashionCardInterior
                 imageUrl={imageUrl}
+                isVideo={false}
                 username={safeUsername}
                 logoSrc={logoSrc}
                 onResultImageLoad={bumpImageReady}
@@ -508,6 +611,7 @@ export default function FashionShareCardsSection({ username }) {
             </div>
           </div>
 
+          ) : null}
           <div className="mb-4 w-full min-w-0 sm:mb-6">
             <div ref={previewWrapRef} className="mx-auto w-full min-w-0 max-w-full sm:max-w-md">
               <motion.div
@@ -532,6 +636,8 @@ export default function FashionShareCardsSection({ username }) {
                     >
                       <FashionCardInterior
                         imageUrl={imageUrl}
+                        isVideo={selectedIsVideo}
+                        interactiveVideo={selectedIsVideo}
                         username={safeUsername}
                         logoSrc={logoSrc}
                         onResultImageLoad={bumpImageReady}
@@ -571,7 +677,7 @@ export default function FashionShareCardsSection({ username }) {
             {jobs.length > 0
               ? `${Math.min(Math.max(0, lookIndex), jobs.length - 1) + 1} / ${jobs.length}`
               : ""}{" "}
-            · 1080×1350 card
+            · {selectedIsVideo ? "Video" : "Image"} · 1080×1350 preview
           </p>
         </>
       )}
@@ -586,19 +692,8 @@ export default function FashionShareCardsSection({ username }) {
               className="box-border inline-flex w-full max-w-full min-w-0 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 px-4 py-3 text-sm font-semibold text-white shadow-md transition-all duration-200 hover:from-violet-500 hover:to-fuchsia-500 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50"
             >
               {exportBusy ? <Loader2 className="w-4 h-4 animate-spin shrink-0" /> : <Download className="w-4 h-4 shrink-0" />}
-              Download card
+              {selectedIsVideo ? "Download video" : "Download card"}
             </button>
-            {"share" in navigator ? (
-              <button
-                type="button"
-                onClick={handleNativeShare}
-                disabled={exportBusy || !imageUrl || !imageReady}
-                className="box-border inline-flex w-full max-w-full min-w-0 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-800 transition-all duration-200 hover:bg-white hover:border-brand-300 active:scale-[0.98] dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:border-brand-500 disabled:opacity-50"
-              >
-                <MessageCircle className="w-4 h-4 shrink-0" />
-                Share…
-              </button>
-            ) : null}
           </div>
 
           <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-2">Share to</p>

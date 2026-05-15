@@ -414,7 +414,12 @@ export const uploadImageService = async ({ userId, imageFile, garmentFile }) => 
 };
 
 export const listMyImagesService = async (userId) => {
-  const docs = await UploadedImage.find({ userId }).sort({ createdAt: -1 }).limit(50);
+  const docs = await UploadedImage.find({
+    userId,
+    resultUrl: { $exists: true, $nin: [null, ""] }
+  })
+    .sort({ createdAt: -1 })
+    .lean();
   return docs.map(toClientImage);
 };
 
