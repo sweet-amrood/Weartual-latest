@@ -347,6 +347,9 @@ export const uploadImageService = async ({ userId, imageFile, garmentFile }) => 
       if (!resultUpload?.secure_url) {
         throw new AppError("Your result could not be saved. Please try again.", 500);
       }
+
+      resultUrl = resultUpload.secure_url;
+      resultType = "video";
     } else {
       await fs.mkdir(RESULT_DIR, { recursive: true });
       const personDiskPath = path.join(UPLOADS_DIR, "image", imageName);
@@ -384,8 +387,8 @@ export const uploadImageService = async ({ userId, imageFile, garmentFile }) => 
       garmentFilename: garmentName,
       imageUrl,
       garmentUrl,
-      status: "pending",
-      processedAt: null,
+      status: "done",
+      processedAt: new Date(),
       error: null,
       resultUrl,
       resultFilename,
@@ -393,10 +396,11 @@ export const uploadImageService = async ({ userId, imageFile, garmentFile }) => 
       stableVitonBundle
     });
 
-    console.info("[images] Job created (pending)", {
+    console.info("[images] Job created (done)", {
       jobId: String(job._id),
       userId: String(userId),
-      status: job.status
+      resultType: job.resultType,
+      resultUrl: job.resultUrl
     });
 
     const lookCount = await syncAccountLookCountFromJobs(userId);
