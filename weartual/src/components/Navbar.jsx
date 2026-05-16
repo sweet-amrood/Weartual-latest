@@ -3,6 +3,7 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { logout as logoutRequest } from "../services/authApi";
 import { LogOut, Home, Info, Mail, Menu, X, Sparkles, History, Sun, Moon } from "lucide-react";
+import { SITE_LOGO_SRC } from "../config/branding";
 import { useTheme } from "../context/ThemeContext.jsx";
 
 export default function Navbar({ user, onLogout }) {
@@ -65,9 +66,13 @@ export default function Navbar({ user, onLogout }) {
 
             {/* Brand */}
             <NavLink to="/" className="flex items-center gap-3 transition-transform hover:scale-[1.02] active:scale-95 duration-200">
-              <div className="h-9 w-9 rounded-xl bg-brand-900 shadow-md shadow-brand-900/20 text-white flex items-center justify-center font-serif text-lg font-bold italic">
-                W
-              </div>
+              <img
+                src={SITE_LOGO_SRC}
+                alt=""
+                width={36}
+                height={36}
+                className="h-9 w-9 rounded-xl object-contain shadow-md shadow-brand-900/15"
+              />
               <div className="leading-tight">
                 <div className="text-slate-900 dark:text-slate-100 font-serif font-bold tracking-tight text-lg">
                   Weartual

@@ -57,9 +57,6 @@ const toClientImage = (doc) => ({
   garmentFilename: doc.garmentFilename,
   imageUrl: doc.imageUrl,
   garmentUrl: doc.garmentUrl,
-  status: doc.status,
-  processedAt: doc.processedAt,
-  error: doc.error,
   resultUrl: doc.resultUrl,
   resultFilename: doc.resultFilename,
   resultType: doc.resultType || "image",
@@ -381,31 +378,28 @@ export const uploadImageService = async ({ userId, imageFile, garmentFile }) => 
       resultType = "image";
     }
 
-    const job = await UploadedImage.create({
+    const savedLook = await UploadedImage.create({
       userId,
       imageFilename: imageName,
       garmentFilename: garmentName,
       imageUrl,
       garmentUrl,
-      status: "done",
-      processedAt: new Date(),
-      error: null,
       resultUrl,
       resultFilename,
       resultType,
       stableVitonBundle
     });
 
-    console.info("[images] Job created (done)", {
-      jobId: String(job._id),
+    console.info("[images] Look saved", {
+      id: String(savedLook._id),
       userId: String(userId),
-      resultType: job.resultType,
-      resultUrl: job.resultUrl
+      resultType: savedLook.resultType,
+      resultUrl: savedLook.resultUrl
     });
 
-    const lookCount = await syncAccountLookCountFromJobs(userId);
+    const lookCount = await syncAccountLookCount(userId);
 
-    return { job: toClientImage(job), lookCount };
+    return { job: toClientImage(savedLook), lookCount };
   } catch (error) {
     if (error instanceof AppError) throw error;
     console.error("[images][cloudinary] Upload pipeline failed:", error?.message || error);
@@ -431,8 +425,8 @@ const toObjectId = (value, label) => {
   return new mongoose.Types.ObjectId(s);
 };
 
-/** Persists how many try-on jobs this account has and returns that number (scoped to `userId` only). */
-const syncAccountLookCountFromJobs = async (userId) => {
+/** Persists how many saved try-ons this account has (scoped to `userId` only). */
+const syncAccountLookCount = async (userId) => {
   const uid = toObjectId(userId, "user id");
   const c = await UploadedImage.countDocuments({ userId: uid });
   const res = await User.updateOne({ _id: uid }, { $set: { totalLookCount: c } });
@@ -440,16 +434,16 @@ const syncAccountLookCountFromJobs = async (userId) => {
   return c;
 };
 
-export const getAccountLookCountService = async (userId) => syncAccountLookCountFromJobs(userId);
+export const getAccountLookCountService = async (userId) => syncAccountLookCount(userId);
 
 export const deleteMyImageService = async (userId, jobId) => {
-  const jid = toObjectId(jobId, "job id");
+  const jid = toObjectId(jobId, "result id");
   const uid = toObjectId(userId, "user id");
   const deleted = await UploadedImage.findOneAndDelete({ _id: jid, userId: uid });
   if (!deleted) {
-    throw new AppError("Job not found", 404);
+    throw new AppError("Result not found", 404);
   }
-  const lookCount = await syncAccountLookCountFromJobs(userId);
+  const lookCount = await syncAccountLookCount(userId);
   return { deleted: true, lookCount };
 };
 
@@ -467,9 +461,9 @@ export const deleteMyImageByResultUrlService = async (userId, resultUrl) => {
     resultUrl: { $in: urlVariants }
   });
   if (!deleted) {
-    throw new AppError("Job not found", 404);
+    throw new AppError("Result not found", 404);
   }
-  const lookCount = await syncAccountLookCountFromJobs(userId);
+  const lookCount = await syncAccountLookCount(userId);
   return { deleted: true, lookCount };
 };
 
@@ -534,22 +528,22 @@ export const getDatasetSampleFileService = async ({ type, name }) => {
  */
 export const getDecartResultFileForStreaming = async (jobId, userId) => {
   if (!mongoose.isValidObjectId(jobId)) {
-    throw new AppError("Invalid job id", 400);
+    throw new AppError("Invalid result id", 400);
   }
 
   const job = await UploadedImage.findOne({ _id: jobId, userId }).select("resultFilename resultType").lean();
   if (!job) {
-    throw new AppError("Job not found", 404);
+    throw new AppError("Result not found", 404);
   }
 
   const safeName = path.basename(job.resultFilename || "");
   if (!safeName || !/\.(mp4|webm|mov)$/i.test(safeName)) {
-    throw new AppError("No streamable video for this job", 404);
+    throw new AppError("No streamable video for this result", 404);
   }
 
   const isVideoJob = job.resultType === "video" || /^irl-out-/i.test(safeName);
   if (!isVideoJob) {
-    throw new AppError("No streamable video for this job", 404);
+    throw new AppError("No streamable video for this result", 404);
   }
 
   const resultRoot = path.resolve(RESULT_DIR);

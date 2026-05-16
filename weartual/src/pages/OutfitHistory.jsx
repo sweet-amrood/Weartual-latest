@@ -41,7 +41,7 @@ const isRemoteResultImage = (entry) => {
   return /^https?:\/\//i.test(u) && !u.startsWith("blob:");
 };
 
-const isNotFoundServerDelete = (err) => /not found|404|Job not found/i.test(String(err?.message || ""));
+const isNotFoundServerDelete = (err) => /not found|404|Result not found/i.test(String(err?.message || ""));
 
 const formatTimestamp = (iso) => {
   if (!iso) return "Unknown time";

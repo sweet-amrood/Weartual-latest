@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { resetPassword as resetPasswordRequest } from "../services/authApi";
 import { Lock, ArrowRight, CheckCircle } from "lucide-react";
+import { SITE_LOGO_SRC } from "../config/branding";
 import { easeOut } from "../lib/motionPresets";
 
 const ResetPassword = () => {
@@ -60,9 +61,13 @@ const ResetPassword = () => {
           transition={reduceMotion ? { duration: 0 } : { duration: 0.42, ease: easeOut }}
         >
           <div className="mb-10 text-center sm:text-left">
-            <div className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-brand-900 text-white shadow-lg shadow-brand-500/30 mb-6">
-              <span className="font-serif text-2xl font-bold italic">W</span>
-            </div>
+            <img
+              src={SITE_LOGO_SRC}
+              alt=""
+              width={48}
+              height={48}
+              className="h-12 w-12 rounded-xl object-contain shadow-lg shadow-brand-500/30 mb-6"
+            />
             <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight text-slate-900 mb-2">Set new password</h1>
             <p className="text-sm text-slate-500">Choose a new password for your Weartual account.</p>
           </div>

@@ -4,6 +4,14 @@ import AppError from "../utils/AppError.js";
 import { getDecartApiKeysForTryOn, maskDecartApiKey } from "../utils/decartApiKeys.js";
 import { isCreditLikeVendorFailure, markApiKeyCooldown } from "../utils/decartKeyCooldown.js";
 
+/** React Native WebView live try-on uses these origins (must match mobile WebView baseUrl). */
+const MOBILE_LIVE_TRYON_ORIGINS = [
+  "http://localhost:5173",
+  "https://localhost:5173",
+  "http://localhost",
+  "https://localhost"
+];
+
 const parseAllowedOrigins = () => {
   const raw = [process.env.DECART_REALTIME_ALLOWED_ORIGINS, process.env.CLIENT_URL].filter(Boolean).join(",");
   const parts = raw
@@ -19,7 +27,7 @@ const parseAllowedOrigins = () => {
       // ignore invalid
     }
   }
-  return [...new Set(out)].slice(0, 20);
+  return [...new Set([...out, ...MOBILE_LIVE_TRYON_ORIGINS])].slice(0, 20);
 };
 
 /**

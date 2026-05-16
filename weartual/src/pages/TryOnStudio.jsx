@@ -759,7 +759,7 @@ export default function TryOnStudio({ user }) {
         data = await deleteMyImage(jobId);
       } catch (err) {
         const msg = String(err?.message || "");
-        const is404 = /not found|404|Job not found/i.test(msg);
+        const is404 = /not found|404|Result not found/i.test(msg);
         if (is404 && resultImage && /^https?:\/\//i.test(String(resultImage).trim())) {
           data = await deleteMyImageByResultUrl(String(resultImage).trim());
         } else {
