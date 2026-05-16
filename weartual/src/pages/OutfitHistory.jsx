@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
 import {
+  ChevronLeft,
+  ChevronRight,
   Clock3,
   History,
   Maximize2,
@@ -26,7 +28,52 @@ import {
 import { deleteMyImage, deleteMyImageByResultUrl, getMyLookCount, listMyImages } from "../services/imageApi";
 import { easeOut } from "../lib/motionPresets";
 
+const HISTORY_PAGE_SIZE = 24;
 const HISTORY_JOB_ID_RE = /^[a-f0-9]{24}$/i;
+
+function HistoryPagination({ page, totalPages, totalItems, onPageChange }) {
+  const start = (page - 1) * HISTORY_PAGE_SIZE + 1;
+  const end = Math.min(page * HISTORY_PAGE_SIZE, totalItems);
+
+  return (
+    <nav
+      className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-slate-700 dark:bg-slate-900 sm:flex-row sm:items-center sm:justify-between"
+      aria-label="History pages"
+    >
+      <p className="text-center text-sm text-slate-600 dark:text-slate-400 sm:text-left tabular-nums">
+        Showing <span className="font-medium text-slate-800 dark:text-slate-200">{start}–{end}</span> of{" "}
+        <span className="font-medium text-slate-800 dark:text-slate-200">{totalItems}</span>
+      </p>
+      {totalPages > 1 ? (
+      <motion.div className="flex items-center justify-center gap-2">
+        <button
+          type="button"
+          onClick={() => onPageChange(page - 1)}
+          disabled={page <= 1}
+          className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-800 transition-colors hover:border-brand-300 hover:bg-brand-50 disabled:pointer-events-none disabled:opacity-40 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:border-brand-500 dark:hover:bg-slate-700"
+          aria-label="Previous page"
+        >
+          <ChevronLeft className="h-4 w-4 shrink-0" aria-hidden />
+          Previous
+        </button>
+        <span className="min-w-[7rem] text-center text-sm font-medium text-slate-700 tabular-nums dark:text-slate-300">
+          Page {page} of {totalPages}
+        </span>
+        <button
+          type="button"
+          onClick={() => onPageChange(page + 1)}
+          disabled={page >= totalPages}
+          className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-800 transition-colors hover:border-brand-300 hover:bg-brand-50 disabled:pointer-events-none disabled:opacity-40 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:border-brand-500 dark:hover:bg-slate-700"
+          aria-label="Next page"
+        >
+          Next
+          <ChevronRight className="h-4 w-4 shrink-0" aria-hidden />
+        </button>
+      </motion.div>
+      ) : null}
+    </nav>
+  );
+}
 
 const normalizeHistoryJobId = (entry) => {
   const raw = entry?.jobId ?? entry?.job_id;
@@ -160,6 +207,7 @@ export default function OutfitHistory({ user }) {
   const [fullscreenEntry, setFullscreenEntry] = useState(null);
   const [imageZoom, setImageZoom] = useState(1);
   const [lookCount, setLookCount] = useState(null);
+  const [page, setPage] = useState(1);
   const [fullscreenImageNatural, setFullscreenImageNatural] = useState(null);
   const [fullscreenImageViewport, setFullscreenImageViewport] = useState({ w: 0, h: 0 });
   const fullscreenImageScrollRef = useRef(null);
@@ -205,6 +253,7 @@ export default function OutfitHistory({ user }) {
         const merged = mergeServerAndLocalHistory(serverJobs, getOutfitHistory(userId));
         setItems(merged);
         setOutfitHistory(userId, merged);
+        setLookCount(merged.length);
       })
       .catch(() => {
         if (!cancelled) {
@@ -290,6 +339,28 @@ export default function OutfitHistory({ user }) {
       window.removeEventListener("resize", measure);
     };
   }, [fullscreenImageSrc]);
+
+  const totalPages = Math.max(1, Math.ceil(items.length / HISTORY_PAGE_SIZE));
+
+  const paginatedItems = useMemo(() => {
+    const start = (page - 1) * HISTORY_PAGE_SIZE;
+    return items.slice(start, start + HISTORY_PAGE_SIZE);
+  }, [items, page]);
+
+  useEffect(() => {
+    setPage((p) => Math.min(Math.max(1, p), totalPages));
+  }, [totalPages]);
+
+  const goToPage = useCallback((nextPage) => {
+    const clamped = Math.min(Math.max(1, nextPage), totalPages);
+    setPage(clamped);
+    const root = document.getElementById("tour-history-root");
+    if (root) {
+      root.scrollIntoView({ behavior: "smooth", block: "start" });
+    } else {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  }, [totalPages]);
 
   const fullscreenImageLayout = useMemo(() => {
     if (!fullscreenImageSrc || !fullscreenImageNatural) {
@@ -508,8 +579,11 @@ export default function OutfitHistory({ user }) {
               <span className="font-medium text-slate-700">
                 {user?.username?.trim() || user?.email || "your account"}
               </span>
-              {lookCount !== null ? (
-                <span className="text-slate-600"> · Your looks: {lookCount}</span>
+              {items.length > 0 || lookCount !== null ? (
+                <span className="text-slate-600">
+                  {" "}
+                  · Your looks: {items.length > 0 ? items.length : lookCount}
+                </span>
               ) : null}
             </p>
           </div>
@@ -527,16 +601,26 @@ export default function OutfitHistory({ user }) {
             <p className="text-slate-500 dark:text-slate-400">Generate a try-on result in Studio to start building your history.</p>
           </motion.div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {items.map((entry, idx) => (
+          <div className="space-y-5">
+            <HistoryPagination
+              page={page}
+              totalPages={totalPages}
+              totalItems={items.length}
+              onPageChange={goToPage}
+            />
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            {paginatedItems.map((entry, pageIdx) => {
+              const globalIdx = (page - 1) * HISTORY_PAGE_SIZE + pageIdx;
+              return (
               <motion.article
-                key={entry.outfitId || `${entry.timestamp}-${idx}`}
+                key={entry.outfitId || `${entry.timestamp}-${globalIdx}`}
                 initial={reduceMotion ? false : { opacity: 0, y: 14 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{
                   duration: reduceMotion ? 0 : 0.38,
                   ease: easeOut,
-                  delay: reduceMotion ? 0 : Math.min(idx, 12) * 0.045
+                  delay: reduceMotion ? 0 : Math.min(pageIdx, 12) * 0.045
                 }}
                 layout={!reduceMotion}
                 whileHover={reduceMotion ? {} : { y: -3 }}
@@ -598,17 +682,26 @@ export default function OutfitHistory({ user }) {
                   <div className="mt-3 pt-3 border-t border-slate-100">
                     <button
                       type="button"
-                      onClick={() => handleDeleteEntry(entry, idx)}
-                      disabled={deletingIndex === idx}
+                      onClick={() => handleDeleteEntry(entry, globalIdx)}
+                      disabled={deletingIndex === globalIdx}
                       className="inline-flex items-center gap-1.5 text-xs font-medium text-rose-600 hover:text-rose-700 disabled:opacity-50 disabled:pointer-events-none"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
-                      {deletingIndex === idx ? "Removing…" : "Delete result"}
+                      {deletingIndex === globalIdx ? "Removing…" : "Delete result"}
                     </button>
                   </div>
                 </div>
               </motion.article>
-            ))}
+            );
+            })}
+            </div>
+
+            <HistoryPagination
+              page={page}
+              totalPages={totalPages}
+              totalItems={items.length}
+              onPageChange={goToPage}
+            />
           </div>
         )}
       </div>

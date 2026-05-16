@@ -50,6 +50,11 @@ const SAMPLE_DATASET_FOLDERS = {
 };
 const SAMPLE_FILE_EXTENSIONS = new Set([".jpg", ".jpeg", ".png", ".webp"]);
 
+/** Only rows with a saved try-on result (matches history UI and share cards). */
+const SAVED_LOOK_RESULT_URL_FILTER = {
+  resultUrl: { $exists: true, $nin: [null, ""] }
+};
+
 const toClientImage = (doc) => ({
   id: doc._id != null ? String(doc._id) : null,
   userId: doc.userId != null ? String(doc.userId) : null,
@@ -410,7 +415,7 @@ export const uploadImageService = async ({ userId, imageFile, garmentFile }) => 
 export const listMyImagesService = async (userId) => {
   const docs = await UploadedImage.find({
     userId,
-    resultUrl: { $exists: true, $nin: [null, ""] }
+    ...SAVED_LOOK_RESULT_URL_FILTER
   })
     .sort({ createdAt: -1 })
     .lean();
@@ -425,10 +430,10 @@ const toObjectId = (value, label) => {
   return new mongoose.Types.ObjectId(s);
 };
 
-/** Persists how many saved try-ons this account has (scoped to `userId` only). */
+/** Persists how many displayable try-ons this account has (scoped to `userId`, with `resultUrl`). */
 const syncAccountLookCount = async (userId) => {
   const uid = toObjectId(userId, "user id");
-  const c = await UploadedImage.countDocuments({ userId: uid });
+  const c = await UploadedImage.countDocuments({ userId: uid, ...SAVED_LOOK_RESULT_URL_FILTER });
   const res = await User.updateOne({ _id: uid }, { $set: { totalLookCount: c } });
   if (res.matchedCount === 0) throw new AppError("User not found", 404);
   return c;
