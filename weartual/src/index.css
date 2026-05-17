@@ -142,6 +142,17 @@
   .animate-fade-in-up {
     animation: fadeInUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   }
+
+  /* History / try-on videos: crop in card, full frame in native player fullscreen */
+  .weartual-native-fs-fit:fullscreen,
+  .weartual-native-fs-fit:-webkit-full-screen {
+    object-fit: contain !important;
+    width: 100% !important;
+    height: 100% !important;
+    max-width: 100vw !important;
+    max-height: 100vh !important;
+    background: #000;
+  }
 }
 
 .driver-popover.weartual-driver-popover {

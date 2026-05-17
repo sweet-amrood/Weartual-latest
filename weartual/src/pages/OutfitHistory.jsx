@@ -503,13 +503,14 @@ export default function OutfitHistory({ user }) {
           >
             {entryIsVideo(fullscreenEntry) ? (
               <div
-                className="mx-auto flex w-full flex-1 cursor-default items-center justify-center overflow-hidden"
+                className="mx-auto flex min-h-0 w-full flex-1 cursor-default items-center justify-center p-2 sm:p-4"
                 onClick={(e) => e.stopPropagation()}
                 role="presentation"
               >
                 <video
+                  key={fullscreenEntry.image}
                   src={fullscreenEntry.image}
-                  className="max-h-[calc(100vh-8rem)] max-w-full rounded-lg shadow-2xl"
+                  className="weartual-native-fs-fit block h-auto w-auto max-h-[calc(100dvh-7rem)] max-w-[min(100%,calc(100vw-2rem))] rounded-lg object-contain shadow-2xl"
                   controls
                   muted
                   playsInline
@@ -608,7 +609,7 @@ export default function OutfitHistory({ user }) {
                   {entryIsVideo(entry) ? (
                     <video
                       src={entry.image}
-                      className="w-full h-full object-cover"
+                      className="weartual-native-fs-fit h-full w-full object-cover"
                       controls
                       muted
                       playsInline
