@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { motion, useReducedMotion } from "motion/react";
 import {
   ChevronLeft,
   ChevronRight,
@@ -26,7 +25,6 @@ import {
   tryMigrateAnonymousOutfitHistory
 } from "../services/outfitHistory";
 import { deleteMyImage, deleteMyImageByResultUrl, getMyLookCount, listMyImages } from "../services/imageApi";
-import { easeOut } from "../lib/motionPresets";
 
 const HISTORY_PAGE_SIZE = 24;
 const HISTORY_JOB_ID_RE = /^[a-f0-9]{24}$/i;
@@ -45,7 +43,7 @@ function HistoryPagination({ page, totalPages, totalItems, onPageChange }) {
         <span className="font-medium text-slate-800 dark:text-slate-200">{totalItems}</span>
       </p>
       {totalPages > 1 ? (
-      <motion.div className="flex items-center justify-center gap-2">
+      <div className="flex items-center justify-center gap-2">
         <button
           type="button"
           onClick={() => onPageChange(page - 1)}
@@ -69,7 +67,7 @@ function HistoryPagination({ page, totalPages, totalItems, onPageChange }) {
           Next
           <ChevronRight className="h-4 w-4 shrink-0" aria-hidden />
         </button>
-      </motion.div>
+      </div>
       ) : null}
     </nav>
   );
@@ -199,7 +197,6 @@ const IMAGE_ZOOM_MAX = 3;
 const IMAGE_ZOOM_STEP = 0.25;
 
 export default function OutfitHistory({ user }) {
-  const reduceMotion = useReducedMotion();
   const userId = useMemo(() => getAuthenticatedUserId(user), [user]);
   const [items, setItems] = useState([]);
   const [ratingsByOutfitId, setRatingsByOutfitId] = useState({});
@@ -563,12 +560,7 @@ export default function OutfitHistory({ user }) {
       ) : null}
 
       <div className="max-w-6xl mx-auto">
-        <motion.div
-          className="flex items-center gap-3 mb-6"
-          initial={reduceMotion ? false : { opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: reduceMotion ? 0 : 0.35, ease: easeOut }}
-        >
+        <div className="flex items-center gap-3 mb-6">
           <div className="w-10 h-10 rounded-xl bg-brand-100 text-brand-700 flex items-center justify-center">
             <Sparkles className="w-5 h-5" />
           </div>
@@ -587,19 +579,14 @@ export default function OutfitHistory({ user }) {
               ) : null}
             </p>
           </div>
-        </motion.div>
+        </div>
 
         {items.length === 0 ? (
-          <motion.div
-            className="rounded-3xl border border-slate-200 bg-white p-10 text-center shadow-sm dark:border-slate-700 dark:bg-slate-900"
-            initial={reduceMotion ? false : { opacity: 0, scale: 0.98 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: reduceMotion ? 0 : 0.35, ease: easeOut }}
-          >
+          <div className="rounded-3xl border border-slate-200 bg-white p-10 text-center shadow-sm dark:border-slate-700 dark:bg-slate-900">
             <History className="w-12 h-12 mx-auto text-slate-300 mb-4" />
             <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-1">No outfits yet</h2>
             <p className="text-slate-500 dark:text-slate-400">Generate a try-on result in Studio to start building your history.</p>
-          </motion.div>
+          </div>
         ) : (
           <div className="space-y-5">
             <HistoryPagination
@@ -613,18 +600,9 @@ export default function OutfitHistory({ user }) {
             {paginatedItems.map((entry, pageIdx) => {
               const globalIdx = (page - 1) * HISTORY_PAGE_SIZE + pageIdx;
               return (
-              <motion.article
+              <article
                 key={entry.outfitId || `${entry.timestamp}-${globalIdx}`}
-                initial={reduceMotion ? false : { opacity: 0, y: 14 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{
-                  duration: reduceMotion ? 0 : 0.38,
-                  ease: easeOut,
-                  delay: reduceMotion ? 0 : Math.min(pageIdx, 12) * 0.045
-                }}
-                layout={!reduceMotion}
-                whileHover={reduceMotion ? {} : { y: -3 }}
-                className="rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-sm dark:border-slate-700 dark:bg-slate-900"
+                className="rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-sm transition-transform hover:-translate-y-0.5 dark:border-slate-700 dark:bg-slate-900"
               >
                 <div className="relative aspect-[4/5] bg-slate-100 group">
                   {entryIsVideo(entry) ? (
@@ -691,7 +669,7 @@ export default function OutfitHistory({ user }) {
                     </button>
                   </div>
                 </div>
-              </motion.article>
+              </article>
             );
             })}
             </div>
