@@ -17,6 +17,7 @@ function markTourFinished(reason = "done") {
   try {
     localStorage.setItem(TOUR_DONE_KEY, reason);
     sessionStorage.removeItem(TOUR_LEG_KEY);
+    sessionStorage.removeItem("weartual_just_signed_up");
   } catch {
     /* ignore */
   }
@@ -64,6 +65,7 @@ export function useWeartualAppTour({ pathname, navigate, user, authLoading }) {
 
     try {
       if (localStorage.getItem(TOUR_DONE_KEY)) return;
+      if (!sessionStorage.getItem("weartual_just_signed_up")) return;
     } catch {
       return;
     }

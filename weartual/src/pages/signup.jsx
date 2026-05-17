@@ -44,6 +44,7 @@ const Signup = ({ onSignup }) => {
         password: formData.password,
       });
       
+      sessionStorage.setItem("weartual_just_signed_up", "true");
       onSignup(response.user);
     } catch (error) {
       setError(error.message || 'Signup failed. Please try again.');
@@ -69,6 +70,7 @@ const Signup = ({ onSignup }) => {
 
     try {
       const response = await googleAuth({ token });
+      sessionStorage.setItem("weartual_just_signed_up", "true");
       onSignup(response.user);
     } catch (error) {
       setError(error.message || 'Google signup failed. Please try again.');

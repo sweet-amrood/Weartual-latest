@@ -212,7 +212,7 @@ export default function Navbar({ user, onLogout }) {
               transition={
                 reduceMotion ? { duration: 0 } : { duration: 0.28, ease: [0.22, 1, 0.36, 1] }
               }
-              className="md:hidden mb-4 overflow-hidden rounded-2xl border border-slate-200 bg-white/95 backdrop-blur p-4 shadow-lg dark:border-slate-600 dark:bg-slate-900/95"
+              className="absolute top-16 left-4 right-4 md:hidden overflow-hidden rounded-2xl border border-slate-200 bg-white/95 backdrop-blur p-4 shadow-lg dark:border-slate-600 dark:bg-slate-900/95"
             >
             <div className="flex flex-col gap-2">
               <NavLink

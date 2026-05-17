@@ -77,7 +77,7 @@ export default function Contact() {
         </p>
       </motion.div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
         {team.map((m, idx) => (
           <motion.button
             key={m.name}
