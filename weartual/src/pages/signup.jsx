@@ -4,7 +4,7 @@ import { GoogleLogin } from '@react-oauth/google';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { googleAuth, signup as signupRequest } from '../services/authApi';
 import { Mail, Lock, EyeOff, Eye, ArrowRight, User } from 'lucide-react';
-import { SITE_LOGO_SRC } from '../config/branding';
+import SiteLogo from "../components/SiteLogo";
 import { easeOut, staggerChildren, fadeUpItem } from '../lib/motionPresets';
 
 const Signup = ({ onSignup }) => {
@@ -96,14 +96,13 @@ const Signup = ({ onSignup }) => {
             initial="hidden"
             animate="show"
           >
-            <motion.img
-              variants={fadeUpItem(reduceMotion)}
-              src={SITE_LOGO_SRC}
-              alt=""
-              width={48}
-              height={48}
-              className="h-12 w-12 rounded-xl object-contain shadow-lg shadow-brand-500/30 mb-6"
-            />
+            <motion.div variants={fadeUpItem(reduceMotion)} className="mb-6">
+              <SiteLogo
+                width={48}
+                height={48}
+                className="h-12 w-12 rounded-xl object-contain shadow-lg shadow-brand-500/30"
+              />
+            </motion.div>
             <motion.h1
               variants={fadeUpItem(reduceMotion)}
               className="text-3xl sm:text-4xl font-semibold tracking-tight text-slate-900 dark:text-slate-100 mb-2"

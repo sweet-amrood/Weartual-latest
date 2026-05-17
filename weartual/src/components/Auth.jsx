@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Eye, EyeOff, Mail, Lock, User, ArrowRight, Loader2, LogOut, CheckCircle2 } from 'lucide-react';
-import { SITE_LOGO_SRC } from '../config/branding';
+import SiteLogo from "./SiteLogo";
 
 const Auth = () => {
   const [view, setView] = useState('login'); // 'login', 'signup', 'forgot'
@@ -112,7 +112,7 @@ const Auth = () => {
       <div className="max-w-[440px] w-full z-10">
         {/* Logo Section */}
         <div className="flex flex-col items-center mb-10">
-          <img src={SITE_LOGO_SRC} alt="" width={48} height={48} className="w-12 h-12 rounded-xl object-contain mb-4" />
+          <SiteLogo width={48} height={48} className="w-12 h-12 rounded-xl object-contain mb-4" />
           <h1 className="text-3xl font-serif font-bold tracking-tight text-black">Weartual</h1>
           <p className="text-gray-400 text-sm mt-1">Virtual Try-On Experience</p>
         </div>

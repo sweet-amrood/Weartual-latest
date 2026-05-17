@@ -13,7 +13,8 @@ import {
   Share2,
   Sparkles
 } from "lucide-react";
-import { SITE_LOGO_SRC } from "../config/branding";
+import { getSiteLogoSrc } from "../config/branding";
+import { useTheme } from "../context/ThemeContext.jsx";
 import { listMyImages } from "../services/imageApi";
 import { easeOut } from "../lib/motionPresets";
 
@@ -263,12 +264,13 @@ export default function FashionShareCardsSection({ username }) {
   const exportRef = useRef(null);
   const previewWrapRef = useRef(null);
   const [previewScale, setPreviewScale] = useState(0.36);
-  const [logoSrc, setLogoSrc] = useState(SITE_LOGO_SRC);
+  const { theme } = useTheme();
+  const [logoSrc, setLogoSrc] = useState(() => getSiteLogoSrc("light"));
   const reduceMotion = useReducedMotion();
 
   useEffect(() => {
-    setLogoSrc(`${window.location.origin}${SITE_LOGO_SRC}`);
-  }, []);
+    setLogoSrc(`${window.location.origin}${getSiteLogoSrc(theme)}`);
+  }, [theme]);
 
   useEffect(() => {
     let cancelled = false;

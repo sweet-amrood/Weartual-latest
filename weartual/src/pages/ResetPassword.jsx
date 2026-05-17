@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { resetPassword as resetPasswordRequest } from "../services/authApi";
 import { Lock, ArrowRight, CheckCircle } from "lucide-react";
-import { SITE_LOGO_SRC } from "../config/branding";
+import SiteLogo from "../components/SiteLogo";
 import { easeOut } from "../lib/motionPresets";
 
 const ResetPassword = () => {
@@ -61,9 +61,7 @@ const ResetPassword = () => {
           transition={reduceMotion ? { duration: 0 } : { duration: 0.42, ease: easeOut }}
         >
           <div className="mb-10 text-center sm:text-left">
-            <img
-              src={SITE_LOGO_SRC}
-              alt=""
+            <SiteLogo
               width={48}
               height={48}
               className="h-12 w-12 rounded-xl object-contain shadow-lg shadow-brand-500/30 mb-6"

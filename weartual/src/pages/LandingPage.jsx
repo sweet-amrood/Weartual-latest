@@ -199,13 +199,13 @@ export default function LandingPage() {
                 key={item.title}
                 variants={howCard}
                 whileHover={reduceMotion ? {} : { y: -3 }}
-                className="rounded-2xl border border-slate-700 bg-slate-900 p-6 text-center shadow-md transition-shadow dark:border-slate-600 dark:bg-slate-900"
+                className="rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-md transition-shadow hover:shadow-lg dark:border-slate-600 dark:bg-slate-900"
               >
-                <div className="w-14 h-14 rounded-2xl bg-indigo-500/25 text-indigo-100 ring-1 ring-indigo-400/30 mx-auto mb-4 flex items-center justify-center dark:bg-indigo-500/20 dark:text-indigo-100 dark:ring-indigo-400/40">
+                <div className="w-14 h-14 rounded-2xl bg-brand-100 text-brand-600 ring-1 ring-brand-200 mx-auto mb-4 flex items-center justify-center dark:bg-indigo-500/20 dark:text-indigo-100 dark:ring-indigo-400/40">
                   <item.icon className="w-7 h-7" />
                 </div>
-                <h3 className="text-lg font-semibold mb-2 text-slate-100">{item.title}</h3>
-                <p className="text-slate-300 text-sm leading-relaxed">{item.desc}</p>
+                <h3 className="text-lg font-semibold mb-2 text-slate-900 dark:text-slate-100">{item.title}</h3>
+                <p className="text-slate-600 text-sm leading-relaxed dark:text-slate-300">{item.desc}</p>
               </motion.div>
             ))}
           </motion.div>
@@ -221,7 +221,7 @@ export default function LandingPage() {
               viewport={{ once: true, margin: "-40px" }}
               transition={{ duration: reduceMotion ? 0 : 0.45, ease: easeOut }}
             >
-              <h2 className="text-3xl font-bold mb-4 dark:text-slate-100">Built for realistic styling output</h2>
+              <h2 className="text-3xl font-bold mb-4 text-slate-900 dark:text-slate-100">Built for realistic styling output</h2>
               <p className="text-slate-600 dark:text-slate-400 mb-8">
                 The Weartual engine preserves identity, pose, and visual details while adapting garments naturally.
               </p>

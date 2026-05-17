@@ -3,7 +3,7 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { logout as logoutRequest } from "../services/authApi";
 import { LogOut, Home, Info, Mail, Menu, X, Sparkles, History, Sun, Moon } from "lucide-react";
-import { SITE_LOGO_SRC } from "../config/branding";
+import SiteLogo from "./SiteLogo";
 import { useTheme } from "../context/ThemeContext.jsx";
 
 export default function Navbar({ user, onLogout }) {
@@ -66,13 +66,9 @@ export default function Navbar({ user, onLogout }) {
 
             {/* Brand */}
             <NavLink to="/" className="flex items-center gap-3 transition-transform hover:scale-[1.02] active:scale-95 duration-200">
-              <img
-                src={SITE_LOGO_SRC}
-                alt=""
-                width={36}
-                height={36}
-                className="h-9 w-9 rounded-xl object-contain shadow-md shadow-brand-900/15"
-              />
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white shadow-md shadow-brand-900/15 ring-1 ring-slate-200/80 dark:bg-transparent dark:shadow-none dark:ring-0">
+                <SiteLogo width={32} height={32} className="h-8 w-8 rounded-lg object-contain" />
+              </span>
               <div className="leading-tight">
                 <div className="text-slate-900 dark:text-slate-100 font-serif font-bold tracking-tight text-lg">
                   Weartual
@@ -86,15 +82,6 @@ export default function Navbar({ user, onLogout }) {
 
           {/* Links & CTA */}
           <div className="flex items-center gap-4 sm:gap-6">
-            <button
-              type="button"
-              onClick={toggleTheme}
-              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white/80 text-slate-700 shadow-sm transition-colors hover:bg-slate-100 dark:border-slate-600 dark:bg-slate-800/80 dark:text-amber-200 dark:hover:bg-slate-700"
-              aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-              title={theme === "dark" ? "Light mode" : "Dark mode"}
-            >
-              {theme === "dark" ? <Sun className="h-5 w-5" strokeWidth={2} /> : <Moon className="h-5 w-5" strokeWidth={2} />}
-            </button>
             {!isAuthRoute && (
               <div className="hidden md:flex items-center gap-6 mr-4">
                 <NavLink to="/" className={navLinkClass}>
@@ -137,7 +124,28 @@ export default function Navbar({ user, onLogout }) {
                     </>
                   )}
                 </NavLink>
+                <button
+                  type="button"
+                  onClick={toggleTheme}
+                  className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white/80 text-slate-700 shadow-sm transition-colors hover:bg-slate-100 dark:border-slate-600 dark:bg-slate-800/80 dark:text-amber-200 dark:hover:bg-slate-700"
+                  aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+                  title={theme === "dark" ? "Light mode" : "Dark mode"}
+                >
+                  {theme === "dark" ? <Sun className="h-5 w-5" strokeWidth={2} /> : <Moon className="h-5 w-5" strokeWidth={2} />}
+                </button>
               </div>
+            )}
+
+            {!isAuthRoute && (
+              <button
+                type="button"
+                onClick={toggleTheme}
+                className="md:hidden inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white/80 text-slate-700 shadow-sm transition-colors hover:bg-slate-100 dark:border-slate-600 dark:bg-slate-800/80 dark:text-amber-200 dark:hover:bg-slate-700"
+                aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+                title={theme === "dark" ? "Light mode" : "Dark mode"}
+              >
+                {theme === "dark" ? <Sun className="h-5 w-5" strokeWidth={2} /> : <Moon className="h-5 w-5" strokeWidth={2} />}
+              </button>
             )}
 
             {user ? (
@@ -167,7 +175,7 @@ export default function Navbar({ user, onLogout }) {
                   <button
                     type="button"
                     onClick={handleLogout}
-                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-slate-900/20 hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:shadow-slate-900/10 dark:hover:bg-white transition-all hover:-translate-y-0.5 active:translate-y-0"
+                    className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition-all hover:border-slate-300 hover:bg-slate-50 active:translate-y-0 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:shadow-none dark:hover:border-slate-500 dark:hover:bg-slate-700 hover:-translate-y-0.5"
                   >
                     <LogOut className="w-4 h-4" />
                     Logout
@@ -269,7 +277,7 @@ export default function Navbar({ user, onLogout }) {
                 <button
                   type="button"
                   onClick={handleLogout}
-                  className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white transition-colors"
+                  className="w-full inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:shadow-none dark:hover:border-slate-500 dark:hover:bg-slate-700"
                 >
                   <LogOut className="w-4 h-4" />
                   Logout

@@ -39,6 +39,7 @@ import {
 } from "../services/outfitHistory";
 import { sanitizePublicErrorMessage } from "../lib/publicErrorMessage";
 import { connectDecartVirtualTryOn, formatLiveSessionDuration } from "../services/decartRealtime";
+import { useTheme } from "../context/ThemeContext.jsx";
 
 const PERSON_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const PERSON_VIDEO_TYPES = ["video/mp4", "video/webm", "video/quicktime"];
@@ -92,6 +93,8 @@ const inferResultIsVideo = (job) => {
 
 export default function TryOnStudio({ user }) {
   const reduceMotion = useReducedMotion();
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
   const [personFile, setPersonFile] = useState(null);
   const [garmentFile, setGarmentFile] = useState(null);
   const [personPreview, setPersonPreview] = useState(null);
@@ -871,6 +874,37 @@ export default function TryOnStudio({ user }) {
     }
   };
 
+  const heroSpotlightStyle = useMemo(
+    () => ({
+      background: isDark
+        ? `radial-gradient(520px circle at ${heroGlow.x}% ${heroGlow.y}%, rgba(99,102,241,0.22), rgba(5,8,20,0.96) 55%)`
+        : `radial-gradient(520px circle at ${heroGlow.x}% ${heroGlow.y}%, rgba(124,58,237,0.16), rgba(248,250,252,0.94) 55%)`
+    }),
+    [isDark, heroGlow.x, heroGlow.y]
+  );
+
+  const heroMeshStyle = useMemo(
+    () => ({
+      background: isDark
+        ? `radial-gradient(ellipse 80% 50% at ${heroParallax.x * 0.85 + 8}% ${heroParallax.y * 0.7 + 10}%, rgba(236,72,153,0.12), transparent 52%),
+           radial-gradient(ellipse 70% 45% at ${100 - heroParallax.x * 0.9}% ${100 - heroParallax.y * 0.75}%, rgba(56,189,248,0.1), transparent 50%)`
+        : `radial-gradient(ellipse 80% 50% at ${heroParallax.x * 0.85 + 8}% ${heroParallax.y * 0.7 + 10}%, rgba(236,72,153,0.14), transparent 52%),
+           radial-gradient(ellipse 70% 45% at ${100 - heroParallax.x * 0.9}% ${100 - heroParallax.y * 0.75}%, rgba(56,189,248,0.12), transparent 50%)`
+    }),
+    [isDark, heroParallax.x, heroParallax.y]
+  );
+
+  const heroOrbStyle = useMemo(
+    () => ({
+      left: `calc(${heroGlow.x}% - min(240px,45vw))`,
+      top: `calc(${heroGlow.y}% - min(240px,45vw))`,
+      background: isDark
+        ? "radial-gradient(circle, rgba(124,58,237,0.28) 0%, rgba(59,130,246,0.18) 38%, rgba(236,72,153,0.12) 62%, rgba(255,255,255,0) 72%)"
+        : "radial-gradient(circle, rgba(124,58,237,0.2) 0%, rgba(59,130,246,0.12) 38%, rgba(236,72,153,0.08) 62%, rgba(255,255,255,0) 72%)"
+    }),
+    [isDark, heroGlow.x, heroGlow.y]
+  );
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
       <div
@@ -878,7 +912,7 @@ export default function TryOnStudio({ user }) {
         className={`mx-auto px-4 py-12 ${liveFeedExpanded ? "max-w-[88rem]" : "max-w-6xl"}`}
       >
         <motion.div
-          className="text-center mb-6 relative isolate overflow-hidden rounded-3xl border border-white/10 bg-[#050814] min-h-[300px] sm:min-h-[340px] flex items-center justify-center px-5 sm:px-6"
+          className="text-center mb-6 relative isolate overflow-hidden rounded-3xl border border-slate-200 bg-gradient-to-br from-brand-50 via-white to-indigo-50 min-h-[300px] sm:min-h-[340px] flex items-center justify-center px-5 sm:px-6 dark:border-white/10 dark:bg-[#050814] dark:from-transparent dark:via-transparent dark:to-transparent"
           initial={reduceMotion ? false : { opacity: 0, y: 18 }}
           animate={{ opacity: 1, y: 0 }}
           transition={reduceMotion ? { duration: 0 } : { duration: 0.48, ease: [0.22, 1, 0.36, 1] }}
@@ -890,33 +924,15 @@ export default function TryOnStudio({ user }) {
           onTouchMove={handleHeroTouchMove}
         >
           {/* Spotlight follows pointer (faster layer) */}
-          <div
-            className="absolute inset-0"
-            style={{
-              background: `radial-gradient(520px circle at ${heroGlow.x}% ${heroGlow.y}%, rgba(99,102,241,0.22), rgba(5,8,20,0.96) 55%)`
-            }}
-          />
+          <div className="absolute inset-0" style={heroSpotlightStyle} />
           {/* Slower parallax mesh — Antigravity-style ambient depth */}
-          <div
-            className="absolute inset-0 opacity-90"
-            style={{
-              background: `
-                radial-gradient(ellipse 80% 50% at ${heroParallax.x * 0.85 + 8}% ${heroParallax.y * 0.7 + 10}%, rgba(236,72,153,0.12), transparent 52%),
-                radial-gradient(ellipse 70% 45% at ${100 - heroParallax.x * 0.9}% ${100 - heroParallax.y * 0.75}%, rgba(56,189,248,0.1), transparent 50%)
-              `
-            }}
-          />
+          <div className="absolute inset-0 opacity-90" style={heroMeshStyle} />
           <div
             className="absolute pointer-events-none w-[min(480px,90vw)] h-[min(480px,90vw)] max-w-[520px] max-h-[520px] rounded-full blur-3xl opacity-90"
-            style={{
-              left: `calc(${heroGlow.x}% - min(240px,45vw))`,
-              top: `calc(${heroGlow.y}% - min(240px,45vw))`,
-              background:
-                "radial-gradient(circle, rgba(124,58,237,0.28) 0%, rgba(59,130,246,0.18) 38%, rgba(236,72,153,0.12) 62%, rgba(255,255,255,0) 72%)"
-            }}
+            style={heroOrbStyle}
           />
           {/* Horizon glow */}
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-indigo-500/[0.07] via-transparent to-transparent" />
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-brand-200/50 via-transparent to-transparent dark:from-indigo-500/[0.07]" />
           {/* Floating tool dock — icon constellation + slow float */}
           {HERO_DOCK_ITEMS.map(({ Icon, top, left, right, delay, mul }, idx) => (
             <div
@@ -931,30 +947,30 @@ export default function TryOnStudio({ user }) {
               }}
             >
               <div
-                className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/15 bg-gradient-to-br from-[rgba(255,255,255,0.14)] to-[rgba(255,255,255,0.03)] shadow-[0_12px_40px_rgba(0,0,0,0.45)] backdrop-blur-md sm:h-[3.25rem] sm:w-[3.25rem] animate-antigravity-dock-float"
+                className="flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200/90 bg-white/80 shadow-[0_8px_28px_rgba(15,23,42,0.1)] backdrop-blur-md sm:h-[3.25rem] sm:w-[3.25rem] animate-antigravity-dock-float dark:border-slate-600/70 dark:bg-slate-800/90 dark:shadow-[0_8px_28px_rgba(0,0,0,0.45)]"
                 style={{ animationDelay: delay }}
               >
-                <Icon className="h-[1.15rem] w-[1.15rem] text-white/75 sm:h-5 sm:w-5" strokeWidth={1.5} />
+                <Icon className="h-[1.15rem] w-[1.15rem] text-brand-600/85 sm:h-5 sm:w-5 dark:text-slate-500" strokeWidth={1.5} />
               </div>
             </div>
           ))}
-          <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.045)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.045)_1px,transparent_1px)] bg-[size:24px_24px] opacity-[0.28]" />
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_0%,rgba(3,7,18,0.55)_100%)]" />
+          <motion.div className="absolute inset-0 bg-[linear-gradient(rgba(148,163,184,0.22)_1px,transparent_1px),linear-gradient(90deg,rgba(148,163,184,0.22)_1px,transparent_1px)] bg-[size:24px_24px] opacity-[0.35] dark:bg-[linear-gradient(rgba(255,255,255,0.045)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.045)_1px,transparent_1px)] dark:opacity-[0.28]" />
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_0%,rgba(241,245,249,0.65)_100%)] dark:bg-[radial-gradient(ellipse_at_center,transparent_0%,rgba(3,7,18,0.55)_100%)]" />
           <div className="relative z-10">
-            <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-white/20 bg-white/[0.08] backdrop-blur-md shadow-sm mb-5">
-              <Sparkles className="w-4 h-4 text-cyan-200/90" />
-              <span className="text-xs font-bold tracking-wider uppercase text-white/85">Weartual Neural Engine v2.0</span>
+            <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-brand-200 bg-white/90 backdrop-blur-md shadow-sm mb-5 dark:border-white/20 dark:bg-white/[0.08]">
+              <Sparkles className="w-4 h-4 text-brand-600 dark:text-slate-500" />
+              <span className="text-xs font-bold tracking-wider uppercase text-brand-800 dark:text-white/85">Weartual Neural Engine v2.0</span>
             </span>
             <h1 className="text-4xl sm:text-5xl lg:text-6xl leading-[1.15] font-bold mb-3 font-sans tracking-tight">
-              <span className="inline-block text-transparent bg-clip-text bg-gradient-to-r from-slate-100 via-indigo-100 to-cyan-100">
+              <span className="inline-block text-transparent bg-clip-text bg-gradient-to-r from-slate-900 via-brand-800 to-indigo-800 dark:from-slate-100 dark:via-indigo-100 dark:to-cyan-100">
                 Achieve flawless fits.
               </span>
               <br />
-              <span className="inline-block text-transparent bg-clip-text bg-gradient-to-r from-cyan-100 via-violet-100 to-fuchsia-100">
+              <span className="inline-block text-transparent bg-clip-text bg-gradient-to-r from-indigo-700 via-violet-700 to-fuchsia-700 dark:from-cyan-100 dark:via-violet-100 dark:to-fuchsia-100">
                 Powered by WEARTUAL.
               </span>
             </h1>
-            <p className="text-white/75 max-w-2xl mx-auto text-[0.95rem] sm:text-base leading-relaxed">
+            <p className="text-slate-600 max-w-2xl mx-auto text-[0.95rem] sm:text-base leading-relaxed dark:text-white/75">
               Upload your subject and garment. Our proprietary deep learning pipeline will synthesize a photorealistic rendering in seconds.
             </p>
           </div>

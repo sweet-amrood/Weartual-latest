@@ -150,12 +150,12 @@ export default function AboutUs() {
           <motion.div
             key={card.n}
             variants={stageVariants}
-            className="rounded-2xl border border-slate-700 bg-slate-900 p-6 shadow-sm"
+            className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900"
             {...(reduceMotion ? {} : { whileHover: { y: -3, transition: { duration: 0.2 } } })}
           >
-            <p className="text-3xl font-bold text-slate-100">{card.n}</p>
-            <p className="mt-2 text-sm font-semibold uppercase tracking-wide text-slate-400">{card.label}</p>
-            <p className="mt-3 text-slate-300 leading-relaxed">{card.body}</p>
+            <p className="text-3xl font-bold text-slate-900 dark:text-slate-100">{card.n}</p>
+            <p className="mt-2 text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{card.label}</p>
+            <p className="mt-3 text-slate-600 leading-relaxed dark:text-slate-300">{card.body}</p>
           </motion.div>
         ))}
       </motion.div>
@@ -188,13 +188,13 @@ export default function AboutUs() {
               {...tapHover}
               className={`text-left rounded-2xl border p-5 transition-colors ${
                 activeStage === idx
-                  ? "border-indigo-400 bg-indigo-950/60 shadow-sm ring-1 ring-indigo-400/40"
-                  : "border-slate-700 bg-slate-900 hover:border-indigo-500/50 hover:bg-slate-800/90"
+                  ? "border-brand-500 bg-brand-50 shadow-sm ring-1 ring-brand-500/30 dark:border-indigo-400 dark:bg-indigo-950/60 dark:ring-indigo-400/40"
+                  : "border-slate-200 bg-white hover:border-brand-300 hover:bg-brand-50/80 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-indigo-500/50 dark:hover:bg-slate-800/90"
               }`}
             >
-              <p className="text-xs font-bold tracking-widest uppercase text-slate-400 mb-2">Stage {idx + 1}</p>
-              <h3 className="text-lg font-semibold text-slate-100 mb-2">{stage.title}</h3>
-              <p className="text-sm text-slate-300 leading-relaxed">{stage.short}</p>
+              <p className="text-xs font-bold tracking-widest uppercase text-slate-500 mb-2 dark:text-slate-400">Stage {idx + 1}</p>
+              <h3 className="text-lg font-semibold text-slate-900 mb-2 dark:text-slate-100">{stage.title}</h3>
+              <p className="text-sm text-slate-600 leading-relaxed dark:text-slate-300">{stage.short}</p>
             </motion.button>
           ))}
         </motion.div>
@@ -207,10 +207,10 @@ export default function AboutUs() {
               animate={{ opacity: 1, y: 0 }}
               exit={reduceMotion ? undefined : { opacity: 0, y: -8 }}
               transition={reduceMotion ? { duration: 0 } : { duration: 0.28, ease: easeOut }}
-              className="mt-5 rounded-2xl border border-slate-700 bg-slate-900 p-6"
+              className="mt-5 rounded-2xl border border-slate-200 bg-white p-6 dark:border-slate-700 dark:bg-slate-900"
             >
-              <h3 className="text-xl font-semibold text-slate-100 mb-3">{pipelineStages[activeStage].title}</h3>
-              <p className="text-slate-300 leading-relaxed">{pipelineStages[activeStage].detail}</p>
+              <h3 className="text-xl font-semibold text-slate-900 mb-3 dark:text-slate-100">{pipelineStages[activeStage].title}</h3>
+              <p className="text-slate-600 leading-relaxed dark:text-slate-300">{pipelineStages[activeStage].detail}</p>
             </motion.div>
           </AnimatePresence>
         </motion.div>
@@ -248,8 +248,8 @@ export default function AboutUs() {
               {...tapHover}
               className={`px-4 py-2 rounded-full text-sm font-semibold transition-colors ${
                 activeChallenge === tab.id
-                  ? "bg-indigo-500 text-white shadow-md"
-                  : "bg-slate-900 border border-slate-600 text-slate-200 hover:border-indigo-400/50 hover:bg-slate-800"
+                  ? "bg-brand-600 text-white shadow-md dark:bg-indigo-500"
+                  : "bg-white border border-slate-200 text-slate-700 hover:border-brand-300 hover:bg-brand-50 dark:bg-slate-900 dark:border-slate-600 dark:text-slate-200 dark:hover:border-indigo-400/50 dark:hover:bg-slate-800"
               }`}
             >
               {tab.label}
@@ -265,12 +265,12 @@ export default function AboutUs() {
               animate={{ opacity: 1, x: 0 }}
               exit={reduceMotion ? undefined : { opacity: 0, x: -10 }}
               transition={reduceMotion ? { duration: 0 } : { duration: 0.3, ease: easeOut }}
-              className="rounded-2xl border border-slate-700 bg-slate-900 p-6"
+              className="rounded-2xl border border-slate-200 bg-white p-6 dark:border-slate-700 dark:bg-slate-900"
             >
-              <h3 className="text-xl font-semibold text-slate-100 mb-4">{challengeFocus[activeChallenge].title}</h3>
+              <h3 className="text-xl font-semibold text-slate-900 mb-4 dark:text-slate-100">{challengeFocus[activeChallenge].title}</h3>
               <div className="space-y-3">
                 {challengeFocus[activeChallenge].points.map((point) => (
-                  <p key={point} className="text-slate-300 leading-relaxed">
+                  <p key={point} className="text-slate-600 leading-relaxed dark:text-slate-300">
                     {point}
                   </p>
                 ))}
@@ -294,15 +294,15 @@ export default function AboutUs() {
             <motion.div
               key={item.q}
               variants={stageVariants}
-              className="rounded-2xl border border-slate-700 bg-slate-900 overflow-hidden"
+              className="rounded-2xl border border-slate-200 bg-white overflow-hidden dark:border-slate-700 dark:bg-slate-900"
             >
               <button
                 type="button"
                 onClick={() => setOpenFaq(openFaq === idx ? -1 : idx)}
-                className="w-full text-left px-5 py-4 flex items-center justify-between hover:bg-slate-800/80 transition-colors"
+                className="w-full text-left px-5 py-4 flex items-center justify-between hover:bg-slate-50 transition-colors dark:hover:bg-slate-800/80"
               >
-                <span className="font-semibold text-slate-100">{item.q}</span>
-                <span className="text-slate-400">{openFaq === idx ? "−" : "+"}</span>
+                <span className="font-semibold text-slate-900 dark:text-slate-100">{item.q}</span>
+                <span className="text-slate-500 dark:text-slate-400">{openFaq === idx ? "−" : "+"}</span>
               </button>
               <AnimatePresence initial={false}>
                 {openFaq === idx ? (
@@ -312,7 +312,7 @@ export default function AboutUs() {
                     exit={reduceMotion ? undefined : { opacity: 0, y: -4 }}
                     transition={reduceMotion ? { duration: 0 } : { duration: 0.22, ease: easeOut }}
                   >
-                    <p className="px-5 pb-5 text-slate-300 leading-relaxed">{item.a}</p>
+                    <p className="px-5 pb-5 text-slate-600 leading-relaxed dark:text-slate-300">{item.a}</p>
                   </motion.div>
                 ) : null}
               </AnimatePresence>
