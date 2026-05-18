@@ -25,6 +25,11 @@ const GARMENT_ALLOWED_CONTENT_TYPES = new Set(["image/jpeg", "image/png", "image
 const DATASET_ALLOWED_EXTENSIONS = new Set([".jpg", ".jpeg", ".png", ".webp", ".json"]);
 const PERSON_MAX_BYTES = 100 * 1024 * 1024;
 const GARMENT_MAX_BYTES = 10 * 1024 * 1024;
+
+const isGhostGarmentEnabled = () => {
+  const raw = String(process.env.GHOST_GARMENT_ENABLED ?? "true").trim().toLowerCase();
+  return !["0", "false", "no", "off"].includes(raw);
+};
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const RESULT_DIR = path.resolve(__dirname, "../../result");
@@ -395,26 +400,37 @@ export const uploadImageService = async ({ userId, imageFile, garmentFile, isAbo
       const outputDiskPath = path.join(RESULT_DIR, resultFilename);
 
       const pipelineT0 = Date.now();
+      const ghostEnabled = isGhostGarmentEnabled();
+      let garmentForDecart = garmentDiskPath;
 
-      // 1) Ghost first (no Cloudinary yet — avoids timeout + unhandled rejection during long ghost)
-      console.info("[images] Starting ghost mannequin on garment", {
-        userId: String(userId),
-        garmentDiskPath,
-        garmentGhostPath
-      });
-      const ghostT0 = Date.now();
-      await runGhostGarmentPipeline({
-        garmentImagePath: garmentDiskPath,
-        outputPath: garmentGhostPath
-      });
-      logTiming("ghost", Date.now() - ghostT0);
+      if (ghostEnabled) {
+        // 1a) Photoroom ghost mannequin on garment
+        console.info("[images] Starting ghost mannequin on garment", {
+          userId: String(userId),
+          garmentDiskPath,
+          garmentGhostPath
+        });
+        const ghostT0 = Date.now();
+        await runGhostGarmentPipeline({
+          garmentImagePath: garmentDiskPath,
+          outputPath: garmentGhostPath
+        });
+        logTiming("ghost", Date.now() - ghostT0);
+        garmentForDecart = garmentGhostPath;
+      } else {
+        console.info("[images] Ghost mannequin skipped (GHOST_GARMENT_ENABLED=false)", {
+          userId: String(userId),
+          garmentDiskPath
+        });
+      }
 
-      // 2) Cloudinary inputs + Decart in parallel (both start only after ghost finishes)
+      // 2) Cloudinary inputs + Decart in parallel
       console.info("[images] Running Decart image try-on (photo.py)", {
         userId: String(userId),
         personDiskPath,
-        garmentDiskPath: garmentGhostPath,
-        outputDiskPath
+        garmentDiskPath: garmentForDecart,
+        outputDiskPath,
+        ghostEnabled
       });
       const parallelT0 = Date.now();
       let imageUpload;
@@ -427,7 +443,7 @@ export const uploadImageService = async ({ userId, imageFile, garmentFile, isAbo
           ]),
           runDecartPhotoPipeline({
             personImagePath: personDiskPath,
-            garmentImagePath: garmentGhostPath,
+            garmentImagePath: garmentForDecart,
             outputPath: outputDiskPath
           })
         ]);
