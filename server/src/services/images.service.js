@@ -30,15 +30,6 @@ const __dirname = path.dirname(__filename);
 const RESULT_DIR = path.resolve(__dirname, "../../result");
 const UPLOADS_DIR = path.resolve(__dirname, "../../uploads");
 
-/** Await a background promise without letting its rejection crash the process. */
-const drainBackgroundPromise = async (promise) => {
-  if (!promise) return;
-  try {
-    await promise;
-  } catch {
-    // Parallel Cloudinary work must not become an unhandled rejection.
-  }
-};
 /** Default UI samples: `weartual/public/dataset/{image,cloth}/` (works when Viton folders are absent / gitignored). */
 const BUNDLED_UI_DATASET_ROOT = path.resolve(__dirname, "../../../weartual/public/dataset");
 const DATASET_ROOT_CANDIDATES = [
@@ -404,90 +395,80 @@ export const uploadImageService = async ({ userId, imageFile, garmentFile, isAbo
       const outputDiskPath = path.join(RESULT_DIR, resultFilename);
 
       const pipelineT0 = Date.now();
-      let cloudinaryInputsPromise = null;
 
+      // 1) Ghost first (no Cloudinary yet — avoids timeout + unhandled rejection during long ghost)
+      console.info("[images] Starting ghost mannequin on garment", {
+        userId: String(userId),
+        garmentDiskPath,
+        garmentGhostPath
+      });
+      const ghostT0 = Date.now();
+      await runGhostGarmentPipeline({
+        garmentImagePath: garmentDiskPath,
+        outputPath: garmentGhostPath
+      });
+      logTiming("ghost", Date.now() - ghostT0);
+
+      // 2) Cloudinary inputs + Decart in parallel (both start only after ghost finishes)
+      console.info("[images] Running Decart image try-on (photo.py)", {
+        userId: String(userId),
+        personDiskPath,
+        garmentDiskPath: garmentGhostPath,
+        outputDiskPath
+      });
+      const parallelT0 = Date.now();
+      let imageUpload;
+      let garmentUpload;
       try {
-        // 1) Ghost first — do not wait for Cloudinary
-        console.info("[images] Starting ghost mannequin on garment", {
-          userId: String(userId),
-          garmentDiskPath,
-          garmentGhostPath
-        });
-        const ghostT0 = Date.now();
-        const ghostPromise = runGhostGarmentPipeline({
-          garmentImagePath: garmentDiskPath,
-          outputPath: garmentGhostPath
-        });
-
-        // 2) Cloudinary inputs right after ghost has started (parallel with ghost/decart)
-        const cloudInputsT0 = Date.now();
-        cloudinaryInputsPromise = Promise.all([
-          uploadBufferToCloudinaryAuto(imageFile.buffer, "uploads/image", imageName),
-          uploadBufferToCloudinary(garmentFile.buffer, "uploads/garment", garmentName)
+        [[imageUpload, garmentUpload]] = await Promise.all([
+          Promise.all([
+            uploadBufferToCloudinaryAuto(imageFile.buffer, "uploads/image", imageName),
+            uploadBufferToCloudinary(garmentFile.buffer, "uploads/garment", garmentName)
+          ]),
+          runDecartPhotoPipeline({
+            personImagePath: personDiskPath,
+            garmentImagePath: garmentGhostPath,
+            outputPath: outputDiskPath
+          })
         ]);
-
-        await ghostPromise;
-        logTiming("ghost", Date.now() - ghostT0);
-
-        // 3) Decart uses original person + ghost-processed garment
-        console.info("[images] Running Decart image try-on (photo.py)", {
-          userId: String(userId),
-          personDiskPath,
-          garmentDiskPath: garmentGhostPath,
-          outputDiskPath
-        });
-        const decartT0 = Date.now();
-        await runDecartPhotoPipeline({
-          personImagePath: personDiskPath,
-          garmentImagePath: garmentGhostPath,
-          outputPath: outputDiskPath
-        });
-        logTiming("decart (photo.py)", Date.now() - decartT0);
-
-        // 4) Finish Cloudinary inputs (likely already done while ghost/decart ran)
-        let imageUpload;
-        let garmentUpload;
-        try {
-          [imageUpload, garmentUpload] = await cloudinaryInputsPromise;
-        } catch (cloudErr) {
-          const msg =
-            cloudErr?.message ||
-            cloudErr?.error?.message ||
-            (typeof cloudErr === "string" ? cloudErr : "Cloudinary upload failed");
-          console.error("[images][cloudinary] Input upload failed:", msg);
-          throw new AppError("Upload could not be completed. Please try again.", 500);
+      } catch (parallelErr) {
+        if (parallelErr instanceof AppError) throw parallelErr;
+        const msg =
+          parallelErr?.message ||
+          parallelErr?.error?.message ||
+          (typeof parallelErr === "string" ? parallelErr : "Try-on pipeline failed");
+        if (/timeout/i.test(msg)) {
+          throw new AppError("Request timed out. Please try again.", 504);
         }
-        logTiming("cloudinary inputs", Date.now() - cloudInputsT0);
-
-        imageUrl = imageUpload?.secure_url;
-        garmentUrl = garmentUpload?.secure_url;
-
-        if (!imageUrl || !garmentUrl) {
-          throw new AppError("Upload could not be completed. Please try again.", 500);
-        }
-
-        console.info("[images] Uploaded to Cloudinary", {
-          userId: String(userId),
-          imageUrl,
-          garmentUrl
-        });
-
-        const resultT0 = Date.now();
-        const resultBuffer = await fs.readFile(outputDiskPath);
-        const resultUpload = await uploadBufferToCloudinary(resultBuffer, "uploads/result", resultFilename);
-        logTiming("cloudinary result", Date.now() - resultT0);
-        logTiming("image try-on total", Date.now() - pipelineT0);
-
-        if (!resultUpload?.secure_url) {
-          throw new AppError("Your result could not be saved. Please try again.", 500);
-        }
-
-        resultUrl = resultUpload.secure_url;
-        resultType = "image";
-      } catch (pipelineErr) {
-        await drainBackgroundPromise(cloudinaryInputsPromise);
-        throw pipelineErr;
+        throw new AppError(msg, 502);
       }
+      logTiming("cloudinary inputs + decart (parallel)", Date.now() - parallelT0);
+
+      imageUrl = imageUpload?.secure_url;
+      garmentUrl = garmentUpload?.secure_url;
+
+      if (!imageUrl || !garmentUrl) {
+        throw new AppError("Upload could not be completed. Please try again.", 500);
+      }
+
+      console.info("[images] Uploaded to Cloudinary", {
+        userId: String(userId),
+        imageUrl,
+        garmentUrl
+      });
+
+      const resultT0 = Date.now();
+      const resultBuffer = await fs.readFile(outputDiskPath);
+      const resultUpload = await uploadBufferToCloudinary(resultBuffer, "uploads/result", resultFilename);
+      logTiming("cloudinary result", Date.now() - resultT0);
+      logTiming("image try-on total", Date.now() - pipelineT0);
+
+      if (!resultUpload?.secure_url) {
+        throw new AppError("Your result could not be saved. Please try again.", 500);
+      }
+
+      resultUrl = resultUpload.secure_url;
+      resultType = "image";
     }
 
     if (isAborted && isAborted()) {

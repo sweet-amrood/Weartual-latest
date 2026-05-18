@@ -12,7 +12,9 @@ if (!CLOUDINARY_CLOUD_NAME || !CLOUDINARY_API_KEY || !CLOUDINARY_API_SECRET) {
 cloudinary.config({
   cloud_name: CLOUDINARY_CLOUD_NAME,
   api_key: CLOUDINARY_API_KEY,
-  api_secret: CLOUDINARY_API_SECRET
+  api_secret: CLOUDINARY_API_SECRET,
+  // Image try-on runs ghost + Decart first; uploads must not time out during that window.
+  timeout: Number.parseInt(process.env.CLOUDINARY_TIMEOUT_MS || "120000", 10)
 });
 
 export default cloudinary;
