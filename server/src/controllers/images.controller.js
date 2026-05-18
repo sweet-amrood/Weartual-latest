@@ -15,7 +15,8 @@ export const uploadMyImage = asyncHandler(async (req, res) => {
   const { job, lookCount } = await uploadImageService({
     userId: req.user.userId,
     imageFile: req.files?.image?.[0],
-    garmentFile: req.files?.garment?.[0]
+    garmentFile: req.files?.garment?.[0],
+    isAborted: () => req.socket?.destroyed || false
   });
 
   res.status(201).json({ success: true, job, lookCount: Number(lookCount) });

@@ -274,7 +274,10 @@ const isPersonVideoFile = (file, imageName) => {
   return PERSON_VIDEO_EXTENSIONS.has(path.extname(imageName).toLowerCase());
 };
 
-export const uploadImageService = async ({ userId, imageFile, garmentFile }) => {
+export const uploadImageService = async ({ userId, imageFile, garmentFile, isAborted }) => {
+  if (isAborted && isAborted()) {
+    throw new AppError("Request aborted by client", 499);
+  }
   validatePersonFile(imageFile);
   validateGarmentFile(garmentFile);
 
@@ -288,6 +291,10 @@ export const uploadImageService = async ({ userId, imageFile, garmentFile }) => 
     writeBufferWithOriginalName("image", imageName, imageFile.buffer),
     writeBufferWithOriginalName("garment", garmentName, garmentFile.buffer)
   ]);
+
+  if (isAborted && isAborted()) {
+    throw new AppError("Request aborted by client", 499);
+  }
 
   try {
     const [imageUpload, garmentUpload] = await Promise.all([
@@ -313,6 +320,10 @@ export const uploadImageService = async ({ userId, imageFile, garmentFile }) => 
     let resultUrl;
     let resultFilename;
     let resultType;
+
+    if (isAborted && isAborted()) {
+      throw new AppError("Request aborted by client", 499);
+    }
 
     if (isPersonVideo) {
       await fs.mkdir(RESULT_DIR, { recursive: true });
@@ -381,6 +392,10 @@ export const uploadImageService = async ({ userId, imageFile, garmentFile }) => 
 
       resultUrl = resultUpload.secure_url;
       resultType = "image";
+    }
+
+    if (isAborted && isAborted()) {
+      throw new AppError("Request aborted by client", 499);
     }
 
     const savedLook = await UploadedImage.create({

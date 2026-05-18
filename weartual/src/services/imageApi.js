@@ -25,14 +25,15 @@ export const deleteMyImageByResultUrl = (resultUrl) =>
     body: JSON.stringify({ resultUrl })
   });
 
-export const uploadMyImage = async ({ imageFile, garmentFile }) => {
+export const uploadMyImage = async ({ imageFile, garmentFile, signal }) => {
   const form = new FormData();
   form.append("image", imageFile);
   form.append("garment", garmentFile);
   const response = await fetch(`${API_URL}/api/images/me`, {
     method: "POST",
     credentials: "include",
-    body: form
+    body: form,
+    signal
   });
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {

@@ -151,6 +151,24 @@ export default function TryOnStudio({ user }) {
   const [currentJobId, setCurrentJobId] = useState(null);
   const heroTargetRef = useRef({ x: 50, y: 50 });
   const compareRef = useRef(null);
+  const abortControllerRef = useRef(null);
+
+  const cancelTryOn = useCallback(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    setStatus("idle");
+    setError("Try-on generation cancelled by user.");
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
 
   const personInputRef = useRef(null);
   const garmentInputRef = useRef(null);
@@ -213,6 +231,10 @@ export default function TryOnStudio({ user }) {
     stopLiveCamera();
     setLiveSessionSummary("");
     setLiveGenerationSeconds(0);
+    if (!user) {
+      setLiveCameraError("Please create an account or log in to use try-on generation.");
+      return;
+    }
     if (!garmentFile) {
       setLiveCameraError("Add a garment image first — live try-on needs a reference outfit.");
       return;
@@ -262,7 +284,7 @@ export default function TryOnStudio({ user }) {
           : msg
       );
     }
-  }, [garmentFile, stopLiveCamera]);
+  }, [user, garmentFile, stopLiveCamera]);
 
   const handlePersonInputModeChange = useCallback(
     (mode) => {
@@ -517,6 +539,12 @@ export default function TryOnStudio({ user }) {
   }, [isProcessing]);
 
   useEffect(() => {
+    if (!user) {
+      setError("Please create an account or log in to use try-on generation.");
+    }
+  }, [user]);
+
+  useEffect(() => {
     if (!isProcessing) {
       setScanOffset(-20);
       return undefined;
@@ -688,6 +716,10 @@ export default function TryOnStudio({ user }) {
   };
 
   const executeTryOn = async ({ person, garment }) => {
+    if (!user) {
+      setError("Please create an account or log in to use try-on generation.");
+      return;
+    }
     if (!person || !garment) return setError("Upload both person and garment images first.");
     try {
       setError("");
@@ -696,7 +728,17 @@ export default function TryOnStudio({ user }) {
       setCurrentJobId(null);
       setActiveStageIndex(0);
       setStageVisible(true);
-      const response = await uploadMyImage({ imageFile: person, garmentFile: garment });
+      
+      abortControllerRef.current = new AbortController();
+      
+      const response = await uploadMyImage({ 
+        imageFile: person, 
+        garmentFile: garment, 
+        signal: abortControllerRef.current.signal 
+      });
+      
+      abortControllerRef.current = null;
+      
       const job = response?.job;
       if (!job?.resultUrl) throw new Error("Result image URL was not generated");
       const outfitId = new Date().toISOString();
@@ -726,6 +768,13 @@ export default function TryOnStudio({ user }) {
       });
       setCurrentJobId(resolvedJobId);
     } catch (err) {
+      if (err.name === "AbortError" || err.message === "The user aborted a request.") {
+        setStatus("idle");
+        setError("Try-on generation cancelled by user.");
+        abortControllerRef.current = null;
+        return;
+      }
+      abortControllerRef.current = null;
       setStatus("error");
       const msg = String(err?.message || "");
       const authLike =
@@ -738,6 +787,10 @@ export default function TryOnStudio({ user }) {
   };
 
   const runTryOn = async () => {
+    if (!user) {
+      setError("Please create an account or log in to use try-on generation.");
+      return;
+    }
     if (!personFile || !garmentFile) return setError("Upload both person and garment images first.");
     setShowOutputSection(true);
     await executeTryOn({ person: personFile, garment: garmentFile });
@@ -1336,7 +1389,7 @@ export default function TryOnStudio({ user }) {
                 {isProcessing ? (
                   <div className="w-full h-full min-h-[200px] flex items-center justify-center p-4 sm:p-6 bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-900">
                     <div className="w-full max-w-md rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl p-8 text-center shadow-2xl relative overflow-hidden">
-                      <div className="absolute inset-0 opacity-40 bg-[radial-gradient(circle_at_50%_10%,rgba(56,189,248,0.25),transparent_38%)]" />
+                      <div className="absolute inset-0 opacity-40 bg-[radial-gradient(circle_at_50%_10%,rgba(56,189,248,0.25),transparent_38%)] pointer-events-none" />
                       <div className="relative mx-auto mb-5 w-16 h-16">
                         <div className="absolute inset-0 rounded-full border border-cyan-300/30 animate-spin" />
                         <div className="absolute inset-[7px] rounded-full border border-fuchsia-300/30 [animation:spin_3.2s_linear_infinite_reverse]" />
@@ -1359,6 +1412,13 @@ export default function TryOnStudio({ user }) {
                       >
                         {AI_PROGRESS_STAGES[activeStageIndex]}
                       </p>
+                      <button
+                        type="button"
+                        onClick={cancelTryOn}
+                        className="relative z-10 mt-6 inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-xs font-semibold text-white/90 hover:bg-white/15 hover:text-white transition-all active:scale-95 shadow-sm"
+                      >
+                        <X className="w-3.5 h-3.5" /> Cancel Generation
+                      </button>
                     </div>
                   </div>
                 ) : status === "success" && resultImage && resultMediaType === "image" && personPreview && personMediaType === "image" ? (
