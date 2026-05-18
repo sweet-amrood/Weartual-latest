@@ -5,16 +5,45 @@ Requires: DECART_API_KEY in the environment.
 """
 import argparse
 import asyncio
+import hashlib
+import logging
 import os
 import sys
 from pathlib import Path
 
+import cv2
 from decart import DecartClient, models
 
-PROMPT = (
-    "change only the upper-body garment using the reference image, keeping face, hair, body, pose, and background exactly unchanged."
+logging.basicConfig(level=logging.INFO, format="%(message)s", stream=sys.stderr)
+logger = logging.getLogger(__name__)
 
+PROMPT = (
+    "replace only the upper-body garment of the input image with the reference image."
 )
+
+
+def prepare_reference_image(source_path: str) -> str:
+    """Resize and re-encode the garment reference so Decart receives a predictable upload."""
+    image = cv2.imread(source_path)
+    if image is None:
+        raise FileNotFoundError(f"Could not read reference image: {source_path}")
+
+    height, width = image.shape[:2]
+    max_side = max(width, height)
+    target_max_side = 512
+    if max_side > target_max_side:
+        scale = target_max_side / max_side
+        resized_width = int(width * scale)
+        resized_height = int(height * scale)
+        image = cv2.resize(image, (resized_width, resized_height), interpolation=cv2.INTER_AREA)
+
+    temp_path = str(Path(source_path).with_name(f"{Path(source_path).stem}_prepared.jpg"))
+    cv2.imwrite(temp_path, image, [cv2.IMWRITE_JPEG_QUALITY, 92])
+    return temp_path
+
+
+def _file_digest(path: str) -> str:
+    return hashlib.sha256(Path(path).read_bytes()).hexdigest()[:16]
 
 
 def _write_result(output_path: str, result) -> None:
@@ -39,21 +68,52 @@ async def run_photo_edit(person_path: str, garment_path: str, output_path: str, 
     if not Path(garment_path).is_file():
         raise FileNotFoundError(f"Garment image not found: {garment_path}")
 
+    if _file_digest(person_path) == _file_digest(garment_path):
+        raise ValueError("Person and garment files are identical; upload two different images.")
+
+    prepared_garment = prepare_reference_image(garment_path)
     resolution = os.environ.get("DECART_IMAGE_RESOLUTION", "720p").strip() or "720p"
 
-    async with DecartClient(api_key=api_key) as client:
-        with open(person_path, "rb") as person_f, open(garment_path, "rb") as garment_f:
+    logger.info(
+        "[decart-photo] person=%s (%s bytes sha=%s) garment=%s prepared=%s (%s bytes sha=%s)",
+        person_path,
+        Path(person_path).stat().st_size,
+        _file_digest(person_path),
+        garment_path,
+        prepared_garment,
+        Path(prepared_garment).stat().st_size,
+        _file_digest(prepared_garment),
+    )
+
+    try:
+        async with DecartClient(api_key=api_key) as client:
             result = await client.process(
                 {
                     "model": models.image("lucy-image-2"),
                     "prompt": PROMPT,
-                    "data": person_f,
-                    "reference_image": garment_f,
+                    "data": person_path,
+                    "reference_image": prepared_garment,
                     "resolution": resolution,
+                    "enhance_prompt": True,
                 }
             )
 
-    _write_result(output_path, result)
+        _write_result(output_path, result)
+
+        if Path(output_path).is_file():
+            out_same_as_person = _file_digest(output_path) == _file_digest(person_path)
+            logger.info(
+                "[decart-photo] output=%s (%s bytes sha=%s identical_to_person=%s)",
+                output_path,
+                Path(output_path).stat().st_size,
+                _file_digest(output_path),
+                out_same_as_person,
+            )
+            if out_same_as_person:
+                logger.warning("[decart-photo] output bytes match person input — garment may not have been applied")
+    finally:
+        if prepared_garment != garment_path:
+            Path(prepared_garment).unlink(missing_ok=True)
 
 
 def main_cli() -> int:

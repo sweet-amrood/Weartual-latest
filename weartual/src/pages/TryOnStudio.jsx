@@ -667,19 +667,44 @@ export default function TryOnStudio({ user }) {
     setCurrentOutfitId(null);
   };
 
-  const captureLiveFrame = () => {
-    const video = liveVideoRef.current;
-    if (!video || video.readyState < 2) {
+  const captureLiveFrame = async () => {
+    setError("");
+    const rawStream = liveTryOnSessionRef.current?.inputStream;
+    let sourceVideo = liveVideoRef.current;
+    let tempVideo = null;
+
+    // Use raw camera frames for offline Generate — not the Decart-edited preview stream.
+    if (rawStream?.getVideoTracks?.().length) {
+      tempVideo = document.createElement("video");
+      tempVideo.srcObject = rawStream;
+      tempVideo.muted = true;
+      tempVideo.playsInline = true;
+      try {
+        await tempVideo.play();
+        if (tempVideo.readyState < 2) {
+          await new Promise((resolve, reject) => {
+            const onReady = () => resolve();
+            const onErr = () => reject(new Error("Camera frame not ready"));
+            tempVideo.addEventListener("loadeddata", onReady, { once: true });
+            tempVideo.addEventListener("error", onErr, { once: true });
+          });
+        }
+        sourceVideo = tempVideo;
+      } catch {
+        tempVideo = null;
+      }
+    }
+
+    if (!sourceVideo || sourceVideo.readyState < 2) {
       setError("Wait for the camera preview, then capture again.");
       return;
     }
-    const w = video.videoWidth;
-    const h = video.videoHeight;
+    const w = sourceVideo.videoWidth;
+    const h = sourceVideo.videoHeight;
     if (!w || !h) {
       setError("Camera is not ready yet.");
       return;
     }
-    setError("");
     const canvas = document.createElement("canvas");
     canvas.width = w;
     canvas.height = h;
@@ -688,9 +713,13 @@ export default function TryOnStudio({ user }) {
       setError("Could not capture frame.");
       return;
     }
-    ctx.drawImage(video, 0, 0, w, h);
+    ctx.drawImage(sourceVideo, 0, 0, w, h);
     canvas.toBlob(
       (blob) => {
+        if (tempVideo) {
+          tempVideo.pause();
+          tempVideo.srcObject = null;
+        }
         if (!blob) {
           setError("Could not capture frame.");
           return;
@@ -1428,7 +1457,7 @@ export default function TryOnStudio({ user }) {
                       <img
                         src={resultImage}
                         alt="Generated try-on result"
-                        className="h-full max-w-none object-cover"
+                        className="h-full max-w-none object-contain object-left"
                         style={{ width: `${compareImageWidth}px` }}
                         draggable={false}
                       />

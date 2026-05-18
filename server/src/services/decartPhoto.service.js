@@ -64,6 +64,14 @@ const runDecartPhotoOnceWithKey = ({
       fn();
     };
 
+    Promise.all([fs.stat(absPerson), fs.stat(absGarment)])
+      .then(([personStat, garmentStat]) => {
+        console.info(
+          `[decart-photo] spawn person=${absPerson} (${personStat.size} bytes) garment=${absGarment} (${garmentStat.size} bytes) -> ${absOut}`
+        );
+      })
+      .catch(() => {});
+
     const child = spawn(pythonBin, [scriptPath, absPerson, absGarment, absOut], {
       env,
       stdio: ["ignore", "pipe", "pipe"]
@@ -105,6 +113,10 @@ const runDecartPhotoOnceWithKey = ({
       } catch {
         finish(() => reject(new AppError("Your try-on finished but the result was unavailable. Please try again.", 502)));
         return;
+      }
+      const logTail = (stderr || stdout).trim();
+      if (logTail) {
+        console.info(`[decart-photo] ${logTail.split("\n").slice(-6).join("\n")}`);
       }
       finish(() => resolve({ outputPath: absOut }));
     });

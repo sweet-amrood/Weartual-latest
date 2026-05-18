@@ -281,6 +281,10 @@ export const uploadImageService = async ({ userId, imageFile, garmentFile, isAbo
   validatePersonFile(imageFile);
   validateGarmentFile(garmentFile);
 
+  if (imageFile.buffer.equals(garmentFile.buffer)) {
+    throw new AppError("Person and garment must be two different images.", 400);
+  }
+
   const imageName = getOriginalFileName(imageFile.originalname, "image.jpg");
   const isPersonVideo = isPersonVideoFile(imageFile, imageName);
   const garmentName = getOriginalFileName(garmentFile.originalname, "garment.jpg");
