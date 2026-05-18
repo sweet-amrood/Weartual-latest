@@ -25,7 +25,8 @@ import {
   RotateCcw,
   Image as LucideImage,
   Video,
-  Camera
+  Camera,
+  Info
 } from "lucide-react";
 import StyleInsightsPanel from "../components/StyleInsightsPanel";
 import {
@@ -151,7 +152,19 @@ export default function TryOnStudio({ user }) {
   const [currentJobId, setCurrentJobId] = useState(null);
   const heroTargetRef = useRef({ x: 50, y: 50 });
   const compareRef = useRef(null);
+  const outputSectionRef = useRef(null);
   const abortControllerRef = useRef(null);
+
+  const scrollOutputIntoView = useCallback(() => {
+    const el = outputSectionRef.current;
+    if (!el) return;
+    const behavior = reduceMotion ? "auto" : "smooth";
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        el.scrollIntoView({ behavior, block: "center", inline: "nearest" });
+      });
+    });
+  }, [reduceMotion]);
 
   const cancelTryOn = useCallback(() => {
     if (abortControllerRef.current) {
@@ -564,6 +577,11 @@ export default function TryOnStudio({ user }) {
     frameId = window.requestAnimationFrame(animateScan);
     return () => window.cancelAnimationFrame(frameId);
   }, [isProcessing]);
+
+  useEffect(() => {
+    if (!showOutputSection || !isProcessing) return;
+    scrollOutputIntoView();
+  }, [showOutputSection, isProcessing, scrollOutputIntoView]);
 
   useEffect(() => {
     const resize = () => {
@@ -1083,6 +1101,21 @@ export default function TryOnStudio({ user }) {
           </div>
         )}
 
+        <motion.div
+          role="note"
+          initial={reduceMotion ? false : { opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={reduceMotion ? { duration: 0 } : { duration: 0.35, ease: "easeOut" }}
+          className="mb-4 flex items-start gap-2.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-left shadow-sm dark:border-slate-600 dark:bg-slate-800/90"
+        >
+          <Info className="mt-0.5 h-4 w-4 shrink-0 text-brand-600 dark:text-brand-400" aria-hidden />
+          <p className="text-xs leading-relaxed text-slate-600 sm:text-[0.8125rem] dark:text-slate-300">
+            <span className="font-semibold text-slate-800 dark:text-slate-100">Best results:</span> use a{" "}
+            <span className="font-semibold text-brand-700 dark:text-brand-300">front-facing</span> person photo or video
+            (upper body visible, good lighting) and a clear garment image on a plain background when possible.
+          </p>
+        </motion.div>
+
         <div
           className={
             liveFeedExpanded
@@ -1339,21 +1372,14 @@ export default function TryOnStudio({ user }) {
           ))}
         </div>
 
-        <div className="mt-6 flex justify-center">
-          <button
-            type="button"
-            onClick={runTryOn}
-            disabled={!canRun}
-            className={`inline-flex items-center justify-center gap-2 px-8 py-3.5 rounded-xl font-semibold ${
-              canRun ? "bg-slate-900 text-white hover:bg-slate-800" : "bg-slate-100 text-slate-400 border border-slate-200"
-            }`}
-          >
-            Generate Try-On <ArrowRight className="w-5 h-5" />
-          </button>
-        </div>
-
         {showOutputSection && (
-          <div className="mx-auto mt-8 w-full max-w-md">
+          <motion.div
+            ref={outputSectionRef}
+            initial={reduceMotion ? false : { opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={reduceMotion ? { duration: 0 } : { duration: 0.3, ease: "easeOut" }}
+            className="mx-auto mt-6 w-full max-w-md scroll-mt-24"
+          >
             <div
               className={`rounded-2xl border border-slate-200 bg-white p-2 flex flex-col dark:border-slate-700 dark:bg-slate-900 ${
                 status === "success" && resultImage ? "h-auto" : "min-h-[200px] sm:min-h-[220px]"
@@ -1573,8 +1599,21 @@ export default function TryOnStudio({ user }) {
                 <StyleInsightsPanel personImageUrl={personPreview} clothImageUrl={garmentPreview} />
               </div>
             )}
-          </div>
+          </motion.div>
         )}
+        <div className="mt-6 flex justify-center">
+          <button
+            type="button"
+            onClick={runTryOn}
+            disabled={!canRun}
+            className={`inline-flex items-center justify-center gap-2 px-8 py-3.5 rounded-xl font-semibold ${
+              canRun ? "bg-slate-900 text-white hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100" : "bg-slate-100 text-slate-400 border border-slate-200 dark:border-slate-700 dark:bg-slate-800/80 dark:text-slate-500"
+            }`}
+          >
+            Generate Try-On <ArrowRight className="w-5 h-5" />
+          </button>
+        </div>
+
       </div>
       {isImageFullscreenOpen && resultImage && resultMediaType === "image" && (
         <div
