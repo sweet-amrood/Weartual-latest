@@ -6,3 +6,4 @@
 # Requires Python 3.10+ (matches `decart`). `realtime` extra is for irl.py (aiortc/av).
 
 decart[realtime]>=0.0.36
+requests>=2.31.0

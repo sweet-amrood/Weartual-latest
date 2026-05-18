@@ -17,7 +17,9 @@ def main():
     if not os.path.exists(input_path):
         raise FileNotFoundError(f"Input image not found: {input_path}")
 
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    out_dir = os.path.dirname(output_path)
+    if out_dir:
+        os.makedirs(out_dir, exist_ok=True)
     print(f"Processing garment image: {input_path}")
 
     with open(input_path, "rb") as f:

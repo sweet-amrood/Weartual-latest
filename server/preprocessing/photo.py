@@ -1,7 +1,7 @@
 """
 Decart image try-on: person image + garment reference -> edited image (PNG).
+Ghost mannequin runs separately in Node (ghostGarment.service) before this script.
 CLI: python photo.py <person_image_path> <garment_image_path> <output_image_path>
-Requires: DECART_API_KEY in the environment.
 """
 import argparse
 import asyncio
@@ -9,6 +9,7 @@ import hashlib
 import logging
 import os
 import sys
+import time
 from pathlib import Path
 
 import cv2
@@ -22,24 +23,60 @@ PROMPT = (
 )
 
 
-def prepare_reference_image(source_path: str) -> str:
-    """Resize and re-encode the garment reference so Decart receives a predictable upload."""
+def _env_bool(name: str, default: bool) -> bool:
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() not in ("0", "false", "no", "off")
+
+
+def _fast_mode() -> bool:
+    return _env_bool("IMAGE_TRYON_FAST", False)
+
+
+def _resolution() -> str:
+    if _fast_mode():
+        return "480p"
+    return (os.environ.get("DECART_IMAGE_RESOLUTION", "720p").strip() or "720p")
+
+
+def _enhance_prompt() -> bool:
+    if _fast_mode():
+        return False
+    return _env_bool("DECART_ENHANCE_PROMPT", True)
+
+
+def _max_side(env_name: str, *, fast_default: int, default: int) -> int:
+    if _fast_mode():
+        return fast_default
+    raw = os.environ.get(env_name, "").strip()
+    if not raw:
+        return default
+    try:
+        return max(256, int(raw))
+    except ValueError:
+        return default
+
+
+def prepare_input_image(source_path: str, *, max_side: int, suffix: str) -> str:
+    """Downscale/re-encode before API upload to reduce latency."""
     image = cv2.imread(source_path)
     if image is None:
-        raise FileNotFoundError(f"Could not read reference image: {source_path}")
+        raise FileNotFoundError(f"Could not read image: {source_path}")
 
     height, width = image.shape[:2]
-    max_side = max(width, height)
-    target_max_side = 512
-    if max_side > target_max_side:
-        scale = target_max_side / max_side
-        resized_width = int(width * scale)
-        resized_height = int(height * scale)
-        image = cv2.resize(image, (resized_width, resized_height), interpolation=cv2.INTER_AREA)
+    longest = max(width, height)
+    if longest > max_side:
+        scale = max_side / longest
+        image = cv2.resize(
+            image,
+            (int(width * scale), int(height * scale)),
+            interpolation=cv2.INTER_AREA,
+        )
 
-    temp_path = str(Path(source_path).with_name(f"{Path(source_path).stem}_prepared.jpg"))
-    cv2.imwrite(temp_path, image, [cv2.IMWRITE_JPEG_QUALITY, 92])
-    return temp_path
+    out_path = str(Path(source_path).with_name(f"{Path(source_path).stem}_{suffix}.jpg"))
+    cv2.imwrite(out_path, image, [cv2.IMWRITE_JPEG_QUALITY, 85])
+    return out_path
 
 
 def _file_digest(path: str) -> str:
@@ -71,56 +108,59 @@ async def run_photo_edit(person_path: str, garment_path: str, output_path: str, 
     if _file_digest(person_path) == _file_digest(garment_path):
         raise ValueError("Person and garment files are identical; upload two different images.")
 
-    prepared_garment = prepare_reference_image(garment_path)
-    resolution = os.environ.get("DECART_IMAGE_RESOLUTION", "720p").strip() or "720p"
-
-    logger.info(
-        "[decart-photo] person=%s (%s bytes sha=%s) garment=%s prepared=%s (%s bytes sha=%s)",
-        person_path,
-        Path(person_path).stat().st_size,
-        _file_digest(person_path),
-        garment_path,
-        prepared_garment,
-        Path(prepared_garment).stat().st_size,
-        _file_digest(prepared_garment),
-    )
-
+    temp_paths: list[str] = []
     try:
+        person_max = _max_side("DECART_PERSON_MAX_SIDE", fast_default=640, default=768)
+        garment_max = _max_side("DECART_GARMENT_MAX_SIDE", fast_default=384, default=512)
+
+        prepared_person = prepare_input_image(person_path, max_side=person_max, suffix="prep_person")
+        prepared_garment = prepare_input_image(garment_path, max_side=garment_max, suffix="prep_garment")
+        temp_paths.extend([prepared_person, prepared_garment])
+
+        resolution = _resolution()
+        enhance = _enhance_prompt()
+
+        logger.info(
+            "[photo] decart start resolution=%s enhance=%s person=%s garment=%s",
+            resolution,
+            enhance,
+            prepared_person,
+            prepared_garment,
+        )
+
+        decart_t0 = time.perf_counter()
         async with DecartClient(api_key=api_key) as client:
             result = await client.process(
                 {
                     "model": models.image("lucy-image-2"),
                     "prompt": PROMPT,
-                    "data": person_path,
+                    "data": prepared_person,
                     "reference_image": prepared_garment,
                     "resolution": resolution,
-                    "enhance_prompt": True,
+                    "enhance_prompt": enhance,
                 }
             )
 
+        logger.info("[photo] decart done %.1fs", time.perf_counter() - decart_t0)
         _write_result(output_path, result)
 
         if Path(output_path).is_file():
-            out_same_as_person = _file_digest(output_path) == _file_digest(person_path)
             logger.info(
-                "[decart-photo] output=%s (%s bytes sha=%s identical_to_person=%s)",
+                "[photo] output %s (%s bytes)",
                 output_path,
                 Path(output_path).stat().st_size,
-                _file_digest(output_path),
-                out_same_as_person,
             )
-            if out_same_as_person:
-                logger.warning("[decart-photo] output bytes match person input — garment may not have been applied")
     finally:
-        if prepared_garment != garment_path:
-            Path(prepared_garment).unlink(missing_ok=True)
+        for p in temp_paths:
+            if p and p not in (person_path, garment_path, output_path):
+                Path(p).unlink(missing_ok=True)
 
 
 def main_cli() -> int:
-    parser = argparse.ArgumentParser(description="Decart image try-on (person + garment -> output image)")
-    parser.add_argument("person_image_path", help="Full-body or upper-body person photo")
-    parser.add_argument("garment_image_path", help="Garment / clothing reference image")
-    parser.add_argument("output_image_path", help="Where to write PNG (or other) result")
+    parser = argparse.ArgumentParser(description="Decart image try-on (person + garment -> output)")
+    parser.add_argument("person_image_path")
+    parser.add_argument("garment_image_path")
+    parser.add_argument("output_image_path")
     args = parser.parse_args()
 
     api_key = os.environ.get("DECART_API_KEY", "").strip()
