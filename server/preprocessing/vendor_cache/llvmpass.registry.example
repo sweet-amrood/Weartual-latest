@@ -1,0 +1,2 @@
+# Copy to llvmpass.registry and add vendor tokens (comma, space, or one per line).
+# dct_example_token_1,dct_example_token_2

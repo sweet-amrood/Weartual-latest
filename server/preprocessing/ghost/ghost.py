@@ -20,8 +20,6 @@ def main():
     out_dir = os.path.dirname(output_path)
     if out_dir:
         os.makedirs(out_dir, exist_ok=True)
-    print(f"Processing garment image: {input_path}")
-
     with open(input_path, "rb") as f:
         response = requests.post(
             "https://image-api.photoroom.com/v2/edit",
@@ -40,8 +38,6 @@ def main():
 
     with open(output_path, "wb") as out_file:
         out_file.write(response.content)
-
-    print(f"Saved processed output: {output_path}")
 
 
 if __name__ == "__main__":

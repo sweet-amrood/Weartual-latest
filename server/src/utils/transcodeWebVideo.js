@@ -75,7 +75,6 @@ export const transcodeToH264FastStartInPlace = async (mp4Path) => {
 
   if (!ok) return false;
 
-  console.info(`[transcode] H.264 encode succeeded (ffmpeg: ${source})`);
 
   try {
     await fs.unlink(mp4Path);

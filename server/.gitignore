@@ -6,7 +6,6 @@ uploads/
 .env.*
 *.pem
 *.key
-
 # Dependencies
 node_modules/
 python_vendor/

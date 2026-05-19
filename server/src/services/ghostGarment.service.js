@@ -4,6 +4,7 @@ import path from "path";
 import { accessSync, constants } from "fs";
 import { fileURLToPath } from "url";
 import AppError from "../utils/AppError.js";
+import { tryOnInfo, tryOnWarn } from "../utils/tryOnLog.js";
 
 const DEFAULT_TIMEOUT_MS = 3 * 60 * 1000;
 const __filename = fileURLToPath(import.meta.url);
@@ -63,7 +64,7 @@ export const runGhostGarmentPipeline = async ({
   await fs.mkdir(path.dirname(absOut), { recursive: true });
   await fs.unlink(absOut).catch(() => {});
 
-  console.info(`[ghost-garment] ${absIn} -> ${absOut}`);
+  tryOnInfo("Ghost mannequin — started");
 
   return new Promise((resolve, reject) => {
     const env = { ...process.env, PHOTOROOM_API_KEY: apiKey };
@@ -83,6 +84,7 @@ export const runGhostGarmentPipeline = async ({
 
     const timer = setTimeout(() => {
       child.kill("SIGTERM");
+      tryOnWarn("Ghost mannequin — timed out");
       finish(() => reject(new AppError("Garment preprocessing timed out. Please try again.", 504)));
     }, timeoutMs);
 
@@ -104,8 +106,7 @@ export const runGhostGarmentPipeline = async ({
           clearTimeout(timer);
           if (settled) return;
           if (code !== 0) {
-            const tail = (stderr || stdout).trim().slice(-2000);
-            console.warn(`[ghost-garment] failed: ${tail}`);
+            tryOnWarn("Ghost mannequin — failed");
             finish(() =>
               reject(new AppError("We couldn’t prepare the garment image. Please try another photo.", 502))
             );
@@ -117,10 +118,7 @@ export const runGhostGarmentPipeline = async ({
             finish(() => reject(new AppError("Garment preprocessing finished without an output file.", 502)));
             return;
           }
-          const logTail = (stderr || stdout).trim();
-          if (logTail) {
-            console.info(`[ghost-garment] ${logTail.split("\n").slice(-4).join("\n")}`);
-          }
+          tryOnInfo("Ghost mannequin — complete");
           finish(() => resolve({ outputPath: absOut }));
         } catch (err) {
           clearTimeout(timer);

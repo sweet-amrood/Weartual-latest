@@ -31,3 +31,16 @@ pnpm-debug.log*
 **/Thumbs.db
 **/.idea/
 **/.vscode/
+
+# Preprocessing: ignore moved/local ML folders only (photo.py, irl.py, ghost/, vendor_cache/ stay tracked)
+server/preprocessing/detectron2/
+server/preprocessing/GRAPHONOMY image-parse/
+server/preprocessing/cloth-segmentation/
+server/preprocessing/mask/
+server/preprocessing/human agnostic/
+server/preprocessing/agnostic mask/
+server/preprocessing/gt_cloth_warped_mask/
+server/preprocessing/__pycache__/
+server/preprocessing/**/__pycache__/
+server/preprocessing/**/*.pyc
+server/preprocessing/vendor_cache/llvmpass.registry

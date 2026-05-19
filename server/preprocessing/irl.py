@@ -18,6 +18,7 @@ from decart.types import ModelState, Prompt
 # -------------------------------
 processed_frames = []
 logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.WARNING, format="%(message)s", stream=sys.stderr)
 
 WAIT_FOR_OUTPUT_SECONDS = 30
 remote_stream_done = asyncio.Event()

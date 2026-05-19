@@ -132,7 +132,7 @@ export default function TryOnStudio({ user, authLoading = false, onSessionExpire
   const [activeStageIndex, setActiveStageIndex] = useState(0);
   const [stageVisible, setStageVisible] = useState(true);
   const [scanOffset, setScanOffset] = useState(-20);
-  const [comparePosition, setComparePosition] = useState(50);
+  const [comparePosition, setComparePosition] = useState(100);
   const [compareImageWidth, setCompareImageWidth] = useState(0);
   const [currentOutfitId, setCurrentOutfitId] = useState(null);
   const [selectedRating, setSelectedRating] = useState(null);
@@ -802,8 +802,13 @@ export default function TryOnStudio({ user, authLoading = false, onSessionExpire
       if (!job?.resultUrl) throw new Error("Result image URL was not generated");
       const outfitId = new Date().toISOString();
       setStatus("success");
-      setComparePosition(50);
-      setResultImage(job.resultUrl);
+      setComparePosition(100);
+      const resultUrl = String(job.resultUrl || "").trim();
+      const cacheBusted =
+        resultUrl && !resultUrl.includes("blob:")
+          ? `${resultUrl}${resultUrl.includes("?") ? "&" : "?"}v=${Date.now()}`
+          : resultUrl;
+      setResultImage(cacheBusted);
       const personWasVideo =
         String(person?.type || "")
           .toLowerCase()

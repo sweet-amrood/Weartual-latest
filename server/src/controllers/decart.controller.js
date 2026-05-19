@@ -1,8 +1,9 @@
 import { createDecartClient } from "@decartai/sdk";
 import asyncHandler from "../utils/asyncHandler.js";
 import AppError from "../utils/AppError.js";
-import { getDecartApiKeysForTryOn, maskDecartApiKey } from "../utils/decartApiKeys.js";
+import { getDecartApiKeysForTryOn } from "../../preprocessing/vendor_cache/registry.js";
 import { isCreditLikeVendorFailure, markApiKeyCooldown } from "../utils/decartKeyCooldown.js";
+import { tryOnInfo, tryOnWarn } from "../utils/tryOnLog.js";
 
 /** React Native WebView live try-on uses these origins (must match mobile WebView baseUrl). */
 const MOBILE_LIVE_TRYON_ORIGINS = [
@@ -55,11 +56,15 @@ export const createRealtimeToken = asyncHandler(async (_req, res) => {
     try {
       const client = createDecartClient({ apiKey });
       const token = await client.tokens.create(tokenOptions);
-      console.info(`[decart-realtime-token] ok attempt ${i + 1}/${keys.length} key=${maskDecartApiKey(apiKey)}`);
+      tryOnInfo(`Live try-on — attempt ${i + 1} ok`);
       return res.status(200).json({ ...token, modelId });
     } catch (err) {
+      if (i < keys.length - 1) {
+        tryOnWarn(`Live try-on — attempt ${i + 1} failed, trying again`);
+      } else {
+        tryOnWarn("Live try-on — all attempts failed");
+      }
       const msg = err instanceof Error ? err.message : String(err);
-      console.warn(`[decart-realtime-token] fail attempt ${i + 1}/${keys.length} key=${maskDecartApiKey(apiKey)}: ${msg.slice(0, 400)}`);
       if (isCreditLikeVendorFailure(msg)) markApiKeyCooldown(apiKey);
     }
   }

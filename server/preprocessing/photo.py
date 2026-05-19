@@ -6,20 +6,19 @@ CLI: python photo.py <person_image_path> <garment_image_path> <output_image_path
 import argparse
 import asyncio
 import hashlib
-import logging
 import os
 import sys
-import time
 from pathlib import Path
 
 import cv2
 from decart import DecartClient, models
 
-logging.basicConfig(level=logging.INFO, format="%(message)s", stream=sys.stderr)
-logger = logging.getLogger(__name__)
-
 PROMPT = (
     "replace only the upper-body garment of the input image with the reference image."
+    # "Virtual try-on: dress the person in the garment shown in the reference image. "
+    # "Replace only their upper-body clothing with that exact garment. "
+    # "Keep face, hair, skin, pose, background, and lower body unchanged. "
+    # "Photorealistic, natural fit and lighting."
 )
 
 
@@ -41,8 +40,7 @@ def _resolution() -> str:
 
 
 def _enhance_prompt() -> bool:
-    if _fast_mode():
-        return False
+    # Fast mode used to disable this; weak prompts often return an unchanged person.
     return _env_bool("DECART_ENHANCE_PROMPT", True)
 
 
@@ -83,6 +81,30 @@ def _file_digest(path: str) -> str:
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()[:16]
 
 
+def _similarity_threshold() -> float:
+    raw = os.environ.get("DECART_SIMILARITY_THRESHOLD", "0.982").strip()
+    try:
+        return min(0.999, max(0.9, float(raw)))
+    except ValueError:
+        return 0.982
+
+
+def _mean_pixel_similarity(path_a: str, path_b: str) -> float:
+    """1.0 = identical pixels (after resize); used to detect no-op try-on results."""
+    a = cv2.imread(path_a)
+    b = cv2.imread(path_b)
+    if a is None or b is None:
+        return 0.0
+    h, w = a.shape[:2]
+    b = cv2.resize(b, (w, h), interpolation=cv2.INTER_AREA)
+    diff = cv2.absdiff(a, b)
+    return 1.0 - (float(diff.mean()) / 255.0)
+
+
+class TryOnNoChangeError(ValueError):
+    """Decart returned an image that is effectively the same as the person input."""
+
+
 def _write_result(output_path: str, result) -> None:
     if isinstance(result, (bytes, bytearray)):
         data = bytes(result)
@@ -111,7 +133,7 @@ async def run_photo_edit(person_path: str, garment_path: str, output_path: str, 
     temp_paths: list[str] = []
     try:
         person_max = _max_side("DECART_PERSON_MAX_SIDE", fast_default=640, default=768)
-        garment_max = _max_side("DECART_GARMENT_MAX_SIDE", fast_default=384, default=512)
+        garment_max = _max_side("DECART_GARMENT_MAX_SIDE", fast_default=512, default=512)
 
         prepared_person = prepare_input_image(person_path, max_side=person_max, suffix="prep_person")
         prepared_garment = prepare_input_image(garment_path, max_side=garment_max, suffix="prep_garment")
@@ -120,15 +142,6 @@ async def run_photo_edit(person_path: str, garment_path: str, output_path: str, 
         resolution = _resolution()
         enhance = _enhance_prompt()
 
-        logger.info(
-            "[photo] decart start resolution=%s enhance=%s person=%s garment=%s",
-            resolution,
-            enhance,
-            prepared_person,
-            prepared_garment,
-        )
-
-        decart_t0 = time.perf_counter()
         async with DecartClient(api_key=api_key) as client:
             result = await client.process(
                 {
@@ -141,15 +154,20 @@ async def run_photo_edit(person_path: str, garment_path: str, output_path: str, 
                 }
             )
 
-        logger.info("[photo] decart done %.1fs", time.perf_counter() - decart_t0)
         _write_result(output_path, result)
 
-        if Path(output_path).is_file():
-            logger.info(
-                "[photo] output %s (%s bytes)",
-                output_path,
-                Path(output_path).stat().st_size,
-            )
+        if _file_digest(output_path) == _file_digest(person_path):
+            Path(output_path).unlink(missing_ok=True)
+            raise TryOnNoChangeError("Output file is byte-identical to the person image.")
+
+        threshold = _similarity_threshold()
+        for ref_label, ref_path in (("prepared person", prepared_person), ("original person", person_path)):
+            sim = _mean_pixel_similarity(output_path, ref_path)
+            if sim >= threshold:
+                Path(output_path).unlink(missing_ok=True)
+                raise TryOnNoChangeError(
+                    f"Output too similar to {ref_label} ({sim:.4f} >= {threshold:.4f})."
+                )
     finally:
         for p in temp_paths:
             if p and p not in (person_path, garment_path, output_path):
@@ -157,7 +175,7 @@ async def run_photo_edit(person_path: str, garment_path: str, output_path: str, 
 
 
 def main_cli() -> int:
-    parser = argparse.ArgumentParser(description="Decart image try-on (person + garment -> output)")
+    parser = argparse.ArgumentParser(description="Image try-on (person + garment -> output)")
     parser.add_argument("person_image_path")
     parser.add_argument("garment_image_path")
     parser.add_argument("output_image_path")
@@ -165,7 +183,7 @@ def main_cli() -> int:
 
     api_key = os.environ.get("DECART_API_KEY", "").strip()
     if not api_key:
-        print("DECART_API_KEY environment variable is required.", file=sys.stderr)
+        print("Try-on API key is required.", file=sys.stderr)
         return 1
 
     try:
@@ -177,6 +195,9 @@ def main_cli() -> int:
                 api_key=api_key,
             )
         )
+    except TryOnNoChangeError as exc:
+        print(f"TryOnNoChange: {exc}", file=sys.stderr)
+        return 3
     except Exception as exc:
         print(f"{type(exc).__name__}: {exc}", file=sys.stderr)
         return 1

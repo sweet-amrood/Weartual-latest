@@ -10,6 +10,7 @@ import { runDecartIrlPipeline } from "./decartIrl.service.js";
 import { runDecartPhotoPipeline } from "./decartPhoto.service.js";
 import { runGhostGarmentPipeline } from "./ghostGarment.service.js";
 import { transcodeToH264FastStartInPlace } from "../utils/transcodeWebVideo.js";
+import { tryOnError, tryOnInfo } from "../utils/tryOnLog.js";
 
 const PERSON_ALLOWED_CONTENT_TYPES = new Set([
   "image/jpeg",
@@ -316,10 +317,6 @@ export const uploadImageService = async ({ userId, imageFile, garmentFile, isAbo
     throw new AppError("Request aborted by client", 499);
   }
 
-  const logTiming = (label, ms) => {
-    console.info(`[images][timing] ${label}: ${ms}ms`);
-  };
-
   try {
     const stableVitonBundle = { personPrefix, clothPrefix, cloudRoot: null, assets: {} };
 
@@ -334,12 +331,11 @@ export const uploadImageService = async ({ userId, imageFile, garmentFile, isAbo
     }
 
     if (isPersonVideo) {
-      const cloudT0 = Date.now();
+      tryOnInfo("Video try-on generation started");
       const [imageUpload, garmentUpload] = await Promise.all([
         uploadBufferToCloudinaryAuto(imageFile.buffer, "uploads/image", imageName),
         uploadBufferToCloudinary(garmentFile.buffer, "uploads/garment", garmentName)
       ]);
-      logTiming("cloudinary inputs (video)", Date.now() - cloudT0);
 
       imageUrl = imageUpload?.secure_url;
       garmentUrl = garmentUpload?.secure_url;
@@ -348,23 +344,11 @@ export const uploadImageService = async ({ userId, imageFile, garmentFile, isAbo
         throw new AppError("Upload could not be completed. Please try again.", 500);
       }
 
-      console.info("[images] Uploaded to Cloudinary", {
-        userId: String(userId),
-        imageUrl,
-        garmentUrl
-      });
       await fs.mkdir(RESULT_DIR, { recursive: true });
       const videoDiskPath = path.join(UPLOADS_DIR, "image", imageName);
       const garmentDiskPath = path.join(UPLOADS_DIR, "garment", garmentName);
       resultFilename = `irl-out-${Date.now()}.mp4`;
       const outputDiskPath = path.join(RESULT_DIR, resultFilename);
-
-      console.info("[images] Running Decart IRL pipeline for person video", {
-        userId: String(userId),
-        videoDiskPath,
-        garmentDiskPath,
-        outputDiskPath
-      });
 
       await runDecartIrlPipeline({
         videoPath: videoDiskPath,
@@ -372,14 +356,7 @@ export const uploadImageService = async ({ userId, imageFile, garmentFile, isAbo
         outputPath: outputDiskPath
       });
 
-      const transcoded = await transcodeToH264FastStartInPlace(outputDiskPath);
-      if (transcoded) {
-        console.info("[images] Transcoded IRL output to H.264 for web playback");
-      } else {
-        console.warn(
-          "[images] FFmpeg H.264 transcode skipped or failed — install ffmpeg and add to PATH (or set FFMPEG_PATH). OpenCV mp4v may not play in all browsers."
-        );
-      }
+      await transcodeToH264FastStartInPlace(outputDiskPath);
 
       const resultBuffer = await fs.readFile(outputDiskPath);
       const resultUpload = await uploadBufferToCloudinaryVideo(resultBuffer, "uploads/result", resultFilename);
@@ -399,40 +376,20 @@ export const uploadImageService = async ({ userId, imageFile, garmentFile, isAbo
       resultFilename = `photo-out-${Date.now()}.png`;
       const outputDiskPath = path.join(RESULT_DIR, resultFilename);
 
-      const pipelineT0 = Date.now();
+      tryOnInfo("Try-on generation started");
       const ghostEnabled = isGhostGarmentEnabled();
       let garmentForDecart = garmentDiskPath;
 
       if (ghostEnabled) {
-        // 1a) Photoroom ghost mannequin on garment
-        console.info("[images] Starting ghost mannequin on garment", {
-          userId: String(userId),
-          garmentDiskPath,
-          garmentGhostPath
-        });
-        const ghostT0 = Date.now();
         await runGhostGarmentPipeline({
           garmentImagePath: garmentDiskPath,
           outputPath: garmentGhostPath
         });
-        logTiming("ghost", Date.now() - ghostT0);
         garmentForDecart = garmentGhostPath;
       } else {
-        console.info("[images] Ghost mannequin skipped (GHOST_GARMENT_ENABLED=false)", {
-          userId: String(userId),
-          garmentDiskPath
-        });
+        tryOnInfo("Ghost mannequin — skipped");
       }
 
-      // 2) Cloudinary inputs + Decart in parallel
-      console.info("[images] Running Decart image try-on (photo.py)", {
-        userId: String(userId),
-        personDiskPath,
-        garmentDiskPath: garmentForDecart,
-        outputDiskPath,
-        ghostEnabled
-      });
-      const parallelT0 = Date.now();
       let imageUpload;
       let garmentUpload;
       try {
@@ -458,7 +415,6 @@ export const uploadImageService = async ({ userId, imageFile, garmentFile, isAbo
         }
         throw new AppError(msg, 502);
       }
-      logTiming("cloudinary inputs + decart (parallel)", Date.now() - parallelT0);
 
       imageUrl = imageUpload?.secure_url;
       garmentUrl = garmentUpload?.secure_url;
@@ -467,17 +423,8 @@ export const uploadImageService = async ({ userId, imageFile, garmentFile, isAbo
         throw new AppError("Upload could not be completed. Please try again.", 500);
       }
 
-      console.info("[images] Uploaded to Cloudinary", {
-        userId: String(userId),
-        imageUrl,
-        garmentUrl
-      });
-
-      const resultT0 = Date.now();
       const resultBuffer = await fs.readFile(outputDiskPath);
       const resultUpload = await uploadBufferToCloudinary(resultBuffer, "uploads/result", resultFilename);
-      logTiming("cloudinary result", Date.now() - resultT0);
-      logTiming("image try-on total", Date.now() - pipelineT0);
 
       if (!resultUpload?.secure_url) {
         throw new AppError("Your result could not be saved. Please try again.", 500);
@@ -503,19 +450,14 @@ export const uploadImageService = async ({ userId, imageFile, garmentFile, isAbo
       stableVitonBundle
     });
 
-    console.info("[images] Look saved", {
-      id: String(savedLook._id),
-      userId: String(userId),
-      resultType: savedLook.resultType,
-      resultUrl: savedLook.resultUrl
-    });
+    tryOnInfo("Try-on saved");
 
     const lookCount = await syncAccountLookCount(userId);
 
     return { job: toClientImage(savedLook), lookCount };
   } catch (error) {
     if (error instanceof AppError) throw error;
-    console.error("[images][cloudinary] Upload pipeline failed:", error?.message || error);
+    tryOnError("Try-on generation failed on server");
     throw new AppError("Upload could not be completed. Please try again.", 502);
   }
 };

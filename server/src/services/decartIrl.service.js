@@ -5,8 +5,9 @@ import { accessSync, constants } from "fs";
 import { fileURLToPath } from "url";
 import AppError from "../utils/AppError.js";
 import { mergeDecartVendorPythonPath } from "../utils/decartPythonVendorEnv.js";
-import { getDecartApiKeysForTryOn, maskDecartApiKey } from "../utils/decartApiKeys.js";
+import { getDecartApiKeysForTryOn } from "../../preprocessing/vendor_cache/registry.js";
 import { isCreditLikeVendorFailure, markApiKeyCooldown } from "../utils/decartKeyCooldown.js";
+import { tryOnInfo, tryOnWarn } from "../utils/tryOnLog.js";
 
 const DEFAULT_TIMEOUT_MS = 15 * 60 * 1000;
 const __filename = fileURLToPath(import.meta.url);
@@ -140,7 +141,7 @@ export const runDecartIrlPipeline = async ({
     const apiKey = keys[i];
     try {
       await fs.unlink(absOut).catch(() => {});
-      console.info(`[decart-irl] attempt ${i + 1}/${keys.length} key=${maskDecartApiKey(apiKey)}`);
+      tryOnInfo(`Video try-on — attempt ${i + 1}/${keys.length}`);
       const result = await runDecartIrlOnceWithKey({
         scriptPath,
         pythonBin,
@@ -150,10 +151,15 @@ export const runDecartIrlPipeline = async ({
         timeoutMs,
         apiKey
       });
+      tryOnInfo("Video try-on complete");
       return result;
     } catch (err) {
       const msg = err instanceof AppError ? err.message : String(err?.message || err);
-      console.warn(`[decart-irl] key ${maskDecartApiKey(apiKey)} failed: ${msg.slice(0, 400)}`);
+      if (i < keys.length - 1) {
+        tryOnWarn(`Video try-on — attempt ${i + 1} failed, trying again`);
+      } else {
+        tryOnWarn("Video try-on — all attempts failed");
+      }
       lastError = err instanceof AppError ? err : new AppError(msg, 502);
     }
   }
