@@ -11,11 +11,12 @@ from pathlib import Path
 
 from decart import DecartClient, models
 
-PROMPT = (
-    "Virtual try-on: apply the upper-body clothing style, colors, pattern, and fit from the reference garment "
-    "image onto the person in the main image. Keep the person's face, hair, skin, body proportions, pose, "
-    "hands, and background unchanged. Output a photorealistic result."
-)
+_VENDOR_CACHE = Path(__file__).resolve().parent.parent / "vendor_cache"
+if str(_VENDOR_CACHE) not in sys.path:
+    sys.path.insert(0, str(_VENDOR_CACHE))
+from prompt_loader import load_prompt
+
+PROMPT = load_prompt("image_tryon")
 
 
 def _write_result(output_path: str, result) -> None:

@@ -13,13 +13,12 @@ from pathlib import Path
 import cv2
 from decart import DecartClient, models
 
-PROMPT = (
-    "replace only the upper-body garment of the input image with the reference image."
-    # "Virtual try-on: dress the person in the garment shown in the reference image. "
-    # "Replace only their upper-body clothing with that exact garment. "
-    # "Keep face, hair, skin, pose, background, and lower body unchanged. "
-    # "Photorealistic, natural fit and lighting."
-)
+_VENDOR_CACHE = Path(__file__).resolve().parent / "vendor_cache"
+if str(_VENDOR_CACHE) not in sys.path:
+    sys.path.insert(0, str(_VENDOR_CACHE))
+from prompt_loader import load_prompt
+
+PROMPT = load_prompt("image_tryon")
 
 
 def _env_bool(name: str, default: bool) -> bool:

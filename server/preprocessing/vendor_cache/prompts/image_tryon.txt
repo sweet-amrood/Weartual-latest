@@ -1,0 +1,5 @@
+replace only the upper-body garment of the input image with the reference image.
+# Virtual try-on: dress the person in the garment shown in the reference image.
+# Replace only their upper-body clothing with that exact garment.
+# Keep face, hair, skin, pose, background, and lower body unchanged.
+# Photorealistic, natural fit and lighting.

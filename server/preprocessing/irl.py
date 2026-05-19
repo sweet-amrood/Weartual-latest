@@ -6,6 +6,11 @@ import sys
 from pathlib import Path
 from contextlib import suppress
 
+_VENDOR_CACHE = Path(__file__).resolve().parent / "vendor_cache"
+if str(_VENDOR_CACHE) not in sys.path:
+    sys.path.insert(0, str(_VENDOR_CACHE))
+from prompt_loader import load_prompt
+
 import cv2
 from aiortc.mediastreams import MediaStreamError
 from aiortc.contrib.media import MediaPlayer
@@ -105,9 +110,7 @@ async def wait_for_connection(client, timeout=15.0):
 
 async def connect_with_reference_image(client, model, track, reference_image_path):
     """Try initial-image connect first, then fall back to applying the image after connect."""
-    prompt_text = (
-        "replace only the upper-body garment of the input image with the reference image."
-    )
+    prompt_text = load_prompt("video_tryon")
 
     base_options = dict(
         model=model,

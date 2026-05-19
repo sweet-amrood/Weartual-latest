@@ -1,0 +1,1 @@
+replace only the upper-body garment of the input image with the reference image.
