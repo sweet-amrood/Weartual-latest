@@ -78,7 +78,12 @@ function AppRoutes() {
         <Routes>
         <Route element={<AnimatedRoutesLayout />}>
           <Route path="/" element={<LandingPage />} />
-          <Route path="/studio" element={<TryOnStudio user={user} />} />
+          <Route
+            path="/studio"
+            element={
+              <TryOnStudio user={user} authLoading={authLoading} onSessionExpired={() => setUser(null)} />
+            }
+          />
           <Route path="/history" element={<OutfitHistory user={user} />} />
           <Route
             path="/profile"

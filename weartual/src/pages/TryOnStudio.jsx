@@ -71,6 +71,7 @@ const FS_ZOOM_STEP = 0.25;
 
 /** Matches server / client copy for try-on when not authenticated. */
 const AUTH_TRY_ON_ERROR_RE = /please create an account or log in to use try-on generation/i;
+const SESSION_EXPIRED_ERROR_RE = /session expired/i;
 
 /** Floating “tool collection” chips — Antigravity-style hero dock (positions %, parallax multiplier, animation delay). */
 const HERO_DOCK_ITEMS = [
@@ -92,7 +93,7 @@ const inferResultIsVideo = (job) => {
   return false;
 };
 
-export default function TryOnStudio({ user }) {
+export default function TryOnStudio({ user, authLoading = false, onSessionExpired }) {
   const reduceMotion = useReducedMotion();
   const { theme } = useTheme();
   const isDark = theme === "dark";
@@ -244,6 +245,10 @@ export default function TryOnStudio({ user }) {
     stopLiveCamera();
     setLiveSessionSummary("");
     setLiveGenerationSeconds(0);
+    if (authLoading) {
+      setLiveCameraError("Checking your session…");
+      return;
+    }
     if (!user) {
       setLiveCameraError("Please create an account or log in to use try-on generation.");
       return;
@@ -297,7 +302,7 @@ export default function TryOnStudio({ user }) {
           : msg
       );
     }
-  }, [user, garmentFile, stopLiveCamera]);
+  }, [user, authLoading, garmentFile, stopLiveCamera]);
 
   const handlePersonInputModeChange = useCallback(
     (mode) => {
@@ -552,10 +557,13 @@ export default function TryOnStudio({ user }) {
   }, [isProcessing]);
 
   useEffect(() => {
+    if (authLoading) return;
     if (!user) {
       setError("Please create an account or log in to use try-on generation.");
+      return;
     }
-  }, [user]);
+    setError((prev) => (AUTH_TRY_ON_ERROR_RE.test(prev) || SESSION_EXPIRED_ERROR_RE.test(prev) ? "" : prev));
+  }, [user, authLoading]);
 
   useEffect(() => {
     if (!isProcessing) {
@@ -763,6 +771,10 @@ export default function TryOnStudio({ user }) {
   };
 
   const executeTryOn = async ({ person, garment }) => {
+    if (authLoading) {
+      setError("Checking your session…");
+      return;
+    }
     if (!user) {
       setError("Please create an account or log in to use try-on generation.");
       return;
@@ -826,14 +838,26 @@ export default function TryOnStudio({ user }) {
       const msg = String(err?.message || "");
       const authLike =
         /please create an account or log in/i.test(msg) ||
+        /session expired/i.test(msg) ||
         /authentication required|invalid or expired token|unauthorized|^401\b/i.test(msg);
-      setError(
-        authLike ? "Please create an account or log in to use try-on generation." : sanitizePublicErrorMessage(msg || "Try-on generation failed.")
-      );
+      if (authLike) {
+        if (user) onSessionExpired?.();
+        setError(
+          user
+            ? "Your session expired. Please log in again."
+            : "Please create an account or log in to use try-on generation."
+        );
+        return;
+      }
+      setError(sanitizePublicErrorMessage(msg || "Try-on generation failed."));
     }
   };
 
   const runTryOn = async () => {
+    if (authLoading) {
+      setError("Checking your session…");
+      return;
+    }
     if (!user) {
       setError("Please create an account or log in to use try-on generation.");
       return;
@@ -1094,6 +1118,17 @@ export default function TryOnStudio({ user }) {
                   log in
                 </Link>{" "}
                 to use try-on generation.
+              </span>
+            ) : SESSION_EXPIRED_ERROR_RE.test(error) ? (
+              <span>
+                Your session expired. Please{" "}
+                <Link
+                  to="/login"
+                  className="font-semibold text-brand-700 underline underline-offset-2 hover:text-brand-800"
+                >
+                  log in
+                </Link>{" "}
+                again.
               </span>
             ) : (
               error

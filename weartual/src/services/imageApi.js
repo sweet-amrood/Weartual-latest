@@ -38,7 +38,11 @@ export const uploadMyImage = async ({ imageFile, garmentFile, signal }) => {
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
     if (response.status === 401) {
-      throw new Error("Please create an account or log in to use try-on generation.");
+      const msg = String(data.message || "").toLowerCase();
+      if (msg.includes("expired") || msg.includes("invalid")) {
+        throw new Error("Your session expired. Please log in again.");
+      }
+      throw new Error("Authentication required");
     }
     throw new Error(sanitizePublicErrorMessage(data.message || "Request failed"));
   }
