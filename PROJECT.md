@@ -2,6 +2,8 @@
 
 Virtual try-on web app: upload a person (photo or video) + garment image, get an AI-generated result. Includes live camera try-on via WebRTC.
 
+**Setup and usage:** see **[README.md](./README.md)**.
+
 **Monorepo root (git):** `frontend/mushi/`  
 **Frontend:** `weartual/` (Vite + React 19 PWA)  
 **Backend:** `server/` (Express + MongoDB + Python preprocessing)

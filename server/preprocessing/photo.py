@@ -1,8 +1,4 @@
-"""
-Decart image try-on: person image + garment reference -> edited image (PNG).
-Ghost mannequin runs separately in Node (ghostGarment.service) before this script.
-CLI: python photo.py <person_image_path> <garment_image_path> <output_image_path>
-"""
+
 import argparse
 import asyncio
 import hashlib
@@ -56,7 +52,7 @@ def _max_side(env_name: str, *, fast_default: int, default: int) -> int:
 
 
 def prepare_input_image(source_path: str, *, max_side: int, suffix: str) -> str:
-    """Downscale/re-encode before API upload to reduce latency."""
+    """Downscale/re-encode before upload to reduce latency."""
     image = cv2.imread(source_path)
     if image is None:
         raise FileNotFoundError(f"Could not read image: {source_path}")
