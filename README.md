@@ -47,7 +47,7 @@ Create `server/.env` with at least:
 ```env
 PORT=5001
 NODE_ENV=development
-MONGODB_URI=mongodb://127.0.0.1:27017/weartual
+MONGODB_URI=your_mongodb_cluster_uri
 JWT_SECRET=your_long_random_secret
 JWT_EXPIRES_IN=7d
 GOOGLE_CLIENT_ID=your_google_client_id
@@ -66,8 +66,8 @@ SMTP_PASS=
 FROM_EMAIL=
 COMPANY_EMAIL=
 
-GHOST_GARMENT_ENABLED=true
-IMAGE_TRYON_FAST=false
+GHOST_GARMENT_ENABLED=true/false         #connected with phootroom ghost mannequin api scripts in preprocessing ghost.py
+IMAGE_TRYON_FAST=false/true              #run processes in parallel in backend reduce overall try on timing to 20-25 seconds if GHOST_GARMENT_ENABLED=false, if true its rake arounds 30-35 seconds, but true will never change the face or anything else of the input person image, but it will also not be that much realstic as of false.
 ```
 
 Use your real values. Do **not** commit `.env`.
