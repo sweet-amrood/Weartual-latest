@@ -91,7 +91,7 @@ Defined in `weartual/src/App.jsx`. Global `Navbar` + page transitions (`Animated
 |------|------|
 | `services/authApi.js` | Signup, login, Google auth, profile, logout |
 | `services/imageApi.js` | Upload try-on, list/delete looks, dataset samples |
-| `services/decartRealtime.js` | Live WebRTC try-on (`connectDecartVirtualTryOn`) |
+| `services/decartRealtime.js` | Live WebRTC try-on (`connectDecartVirtualTryOn`, `applyLiveRealtimeSet`) |
 | `services/outfitHistory.js` | Local history + ratings (`localStorage`) |
 | `services/feedbackApi.js` | Contact form submission |
 | `config/api.js` | `API_URL` from `VITE_API_URL` |
@@ -270,24 +270,44 @@ Optional playback: `GET /api/images/jobs/:jobId/decart-result` streams local MP4
 
 ### C. Live camera try-on (WebRTC)
 
+In **Try On Studio**, choose **Live** as the person input mode. Live try-on uses Decart realtime (`lucy-vton-2` by default) over WebRTC.
+
 ```mermaid
 sequenceDiagram
   participant UI as TryOnStudio
   participant API as POST /api/decart/realtime-token
   participant SDK as @decartai/sdk
 
+  UI->>UI: Upload Garment Image (required)
   UI->>UI: getUserMedia()
   UI->>API: request token (auth)
   API-->>UI: apiKey + modelId
   UI->>SDK: realtime.connect(camera)
-  UI->>SDK: set(garment image + prompt)
+  UI->>SDK: set(garment image + prompt, enhance false)
   SDK-->>UI: processed video stream
 ```
 
-**Frontend:** `connectDecartVirtualTryOn()` in `decartRealtime.js`.  
+**Frontend:** `connectDecartVirtualTryOn()` and `applyLiveRealtimeSet()` in `decartRealtime.js`.  
 **Backend:** `createRealtimeToken` in `decart.controller.js`.
 
-Captured live frames can be saved as JPEG and run through the **offline image** pipeline.
+#### Live try-on rules (garment + optional accessories)
+
+Decart realtime accepts **one reference image** per `set()` call. The studio always uses the **Garment Image** block as that reference.
+
+| Setting | Reference image | Prompt |
+|---------|-----------------|--------|
+| **Add accessories** off | Garment Image | Fixed garment VTON prompt (`PROMPT_GARMENT_LIVE` in code) |
+| **Add accessories** on | Same Garment Image | Garment prompt + your extra text (glasses, watch, hat, cap, etc.) in **one** combined string |
+
+Important implementation details:
+
+- **One atomic `set()`** — garment file + full prompt are sent together. Do **not** call `setPrompt()` afterward; a second prompt-only update drops the garment try-on after a few seconds.
+- **`enhance` is always `false`** for live garment mode so Decart does not rewrite the VTON instructions.
+- **`VITE_DECART_VTON_PROMPT`** — default **accessory** text when the extra prompt field is empty (not the main garment prompt).
+- **Connect** requires a garment upload; accessories are optional text only (no second reference upload).
+- While connected, use **Re-apply garment** or **Re-apply garment + accessory** after changing garment or accessory text.
+
+Captured live frames can be saved as JPEG and run through the **offline image** pipeline (`POST /api/images/me`).
 
 ---
 
@@ -344,7 +364,7 @@ Never commit `.env` or `llvmpass.registry`. Values below are **names only**.
 |----------|---------|
 | `VITE_DECART_REALTIME_MODEL` | Live model override |
 | `VITE_DECART_LIVE_MIRROR` | Camera mirror: `true` / `false` / auto |
-| `VITE_DECART_VTON_PROMPT` | Live try-on prompt text |
+| `VITE_DECART_VTON_PROMPT` | Default **accessory** prompt when “Add accessories” is on and the textarea is empty |
 | `VITE_DECART_LIVE_MAX_KEY_ATTEMPTS` | Connect retries |
 | `VITE_DECART_LIVE_MAX_MID_ROTATIONS` | Mid-session key rotation |
 | `VITE_DECART_API_KEY` | Dev-only fallback if token endpoint fails |
@@ -442,4 +462,4 @@ A row counts as a saved look when `resultUrl` is set.
 
 ---
 
-*Last updated: project structure as of local development setup. For secrets, use `.env` and `llvmpass.registry` only — never commit them.*
+*Last updated: includes live try-on garment-always + merged accessory prompt behavior. For secrets, use `.env` and `llvmpass.registry` only — never commit them.*

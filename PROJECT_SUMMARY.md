@@ -239,23 +239,36 @@ sequenceDiagram
 
 ### Flow B: Live Camera Try-On (WebRTC)
 
+Studio **Live** mode (`TryOnStudio.jsx` + `decartRealtime.js`). The **Garment Image** upload is always the single Decart reference image.
+
 ```mermaid
 sequenceDiagram
   autonumber
   participant Client as React App (Studio)
   participant API as Express API (/api/decart/realtime-token)
   participant DecartSDK as Decart WebRTC SDK
-  participant DecartServer as Decart Realtime server (lucy-2.1-vton)
+  participant DecartServer as Decart Realtime server (lucy-vton-2 default)
 
+  Client->>Client: Upload Garment Image (required)
   Client->>Client: getUserMedia() -> initialize camera stream
   Client->>API: POST /api/decart/realtime-token (requires login cookie)
   API->>API: fetch keys from llvmpass.registry & check cooldowns
   API-->>Client: return transient session token + active Model ID
   Client->>DecartSDK: connect(sessionToken, cameraStream)
   DecartSDK->>DecartServer: establish WebRTC PeerConnection
-  Client->>DecartSDK: setConfig(garment image + instruction prompt)
-  DecartServer-->>Client: stream processed AI try-on frames back to <video> tag
+  Client->>DecartSDK: set(garment image + combined prompt, enhance false)
+  Note over Client,DecartSDK: Optional "Add accessories" merges extra text into same prompt (one set() call)
+  DecartServer-->>Client: stream processed AI try-on frames back to video preview
 ```
+
+**Garment + accessories behavior:**
+
+| Add accessories | Reference | Prompt |
+|-----------------|-----------|--------|
+| Off | Garment Image only | Built-in garment VTON prompt |
+| On | Same Garment Image | Garment prompt + user/env accessory text (single string) |
+
+Do not send a follow-up `setPrompt()` without the garment image — it removes the try-on effect. `VITE_DECART_VTON_PROMPT` is the default accessory line only.
 
 ---
 

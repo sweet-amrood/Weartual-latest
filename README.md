@@ -177,13 +177,20 @@ Results are saved to your account and shown in the studio. Failed “no change�
 
 ### Live camera try-on
 
-1. In Studio, start **live** / camera mode (when available in the UI).
-2. Allow camera permission.
-3. The app requests a short-lived token from `POST /api/decart/realtime-token`.
-4. Garment is sent to Decart over WebRTC; processed video appears in the preview.
-5. You can capture a frame and run an **offline** image try-on from that capture.
+1. In Studio, set **Person input** to **Live**.
+2. Upload a **Garment Image** (required before connecting).
+3. Allow camera permission and connect live try-on.
+4. The app requests a short-lived token from `POST /api/decart/realtime-token`.
+5. Your garment is sent to Decart as the **only** reference image; processed video appears in the preview.
+6. Optionally turn on **Add accessories** and describe extras (glasses, watch, hat, cap, etc.) in the text field — this is merged into the same prompt as the garment try-on, not a second image.
+7. Use **Re-apply garment** / **Re-apply garment + accessory** if you change the garment or accessory text mid-session.
+8. Capture a frame to run an **offline** image try-on from that capture.
 
-Live prompt text can be tuned via `VITE_DECART_VTON_PROMPT` in `weartual/.env` (see `decartRealtime.js`).
+**Defaults and env:**
+
+- Garment VTON wording is fixed in `weartual/src/services/decartRealtime.js` (`PROMPT_GARMENT_LIVE`).
+- `VITE_DECART_VTON_PROMPT` in `weartual/.env` sets the default **accessory** text when the extra prompt field is empty.
+- Live mode keeps `enhance: false` so the garment reference stays faithful.
 
 ### Outfit history (`/history`)
 
@@ -208,7 +215,8 @@ Live prompt text can be tuned via `VITE_DECART_VTON_PROMPT` in `weartual/.env` (
 | Image try-on prompt | `server/preprocessing/vendor_cache/prompts/image_tryon.txt` |
 | Video try-on prompt | `server/preprocessing/vendor_cache/prompts/video_tryon.txt` |
 | Decart API keys | `server/preprocessing/vendor_cache/llvmpass.registry` |
-| Live try-on prompt (browser) | `VITE_DECART_VTON_PROMPT` in `weartual/.env` |
+| Live accessory default prompt (browser) | `VITE_DECART_VTON_PROMPT` in `weartual/.env` |
+| Live garment VTON prompt (code) | `PROMPT_GARMENT_LIVE` in `weartual/src/services/decartRealtime.js` |
 
 Lines starting with `#` in `.txt` prompt files are comments.
 
