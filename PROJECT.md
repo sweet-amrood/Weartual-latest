@@ -59,7 +59,7 @@ mushi/
     └── .env
 ```
 
-**Note:** Large ML folders under `server/preprocessing/` (detectron2, GRAPHONOMY, etc.) are gitignored. Only `photo.py`, `irl.py`, `ghost/`, and `vendor_cache/` (except secrets) are tracked.
+**Note:** Large ML folders under `server/preprocessing/` (detectron2, GRAPHONOMY, etc.) are gitignored.
 
 ---
 
