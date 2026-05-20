@@ -47,7 +47,7 @@ Create `server/.env` with at least:
 ```env
 PORT=5001
 NODE_ENV=development
-MONGODB_URI=mongodb://127.0.0.1:27017/weartual
+MONGODB_URI=your_mongodb_cluster_uri
 JWT_SECRET=your_long_random_secret
 JWT_EXPIRES_IN=7d
 GOOGLE_CLIENT_ID=your_google_client_id
