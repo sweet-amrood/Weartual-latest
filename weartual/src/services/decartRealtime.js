@@ -4,11 +4,6 @@ import { sanitizePublicErrorMessage } from "../lib/publicErrorMessage";
 
 const DEFAULT_MODEL = import.meta.env.VITE_DECART_REALTIME_MODEL || "lucy-vton-2";
 
-/**
- * Pre-flip camera input before sending to Decart so server-baked overlays/watermarks
- * align with display orientation. See Decart JS Realtime docs → Front-camera mirroring.
- * @type {boolean | "auto"}
- */
 const LIVE_MIRROR =
   import.meta.env.VITE_DECART_LIVE_MIRROR === "true"
     ? true
@@ -16,14 +11,77 @@ const LIVE_MIRROR =
       ? false
       : "auto";
 
-/** Default prompt for Lucy VTON realtime garment transfer. */
-export const LIVE_VTON_PROMPT =
-  import.meta.env.VITE_DECART_VTON_PROMPT ||
-  "Virtual try-on: realistically dress the person in the reference garment. Preserve identity, pose, and lighting where possible.";
+/** Always sent as the reference image (Garment Image in studio). */
+const PROMPT_GARMENT_LIVE =
+  "Virtual try-on: replace only the upper-body garment of the person in the live camera video with the exact garment shown in the reference image. " +
+  "Keep face, hair, skin, body shape, pose, and background unchanged. " +
+  "Use only the provided reference garment — do not invent different clothing.";
+
+const PROMPT_ACCESSORY_EXTRA_DEFAULT =
+  "add realistic glasses, a watch, a hat, or a cap on the person without changing the garment.";
+
+export function getAccessoryDefaultPrompt() {
+  const fromEnv = String(import.meta.env.VITE_DECART_VTON_PROMPT ?? "").trim();
+  return fromEnv || PROMPT_ACCESSORY_EXTRA_DEFAULT;
+}
+
+/** Single prompt string: garment VTON + optional accessory text (must not use setPrompt — it drops the garment). */
+function buildCombinedLivePrompt(userPrompt) {
+  const extra = String(userPrompt ?? "").trim() || getAccessoryDefaultPrompt();
+  return (
+    PROMPT_GARMENT_LIVE +
+    " Keep the exact garment from the reference image at all times. " +
+    "Additionally, without replacing or removing that garment, " +
+    extra
+  );
+}
+
+/**
+ * @param {{
+ *   accessoryMode?: boolean,
+ *   prompt?: string,
+ *   enhance?: boolean,
+ *   garmentImage?: File | Blob | null
+ * }} input
+ */
+export function resolveLiveRealtimeConfig(input = {}) {
+  const garmentImage = input.garmentImage ?? null;
+  const accessoryMode = input.accessoryMode === true;
+  const prompt = accessoryMode ? buildCombinedLivePrompt(input.prompt) : PROMPT_GARMENT_LIVE;
+
+  return {
+    garmentImage,
+    accessoryMode,
+    prompt,
+    /** Always false when a garment reference image is used — enhance rewrites away the VTON instructions. */
+    enhance: false
+  };
+}
+
+/**
+ * One atomic set(): garment reference image + prompt (accessories merged into the same prompt).
+ */
+export async function applyLiveRealtimeSet(realtimeClient, config = {}) {
+  const { garmentImage, accessoryMode, prompt, enhance } = resolveLiveRealtimeConfig(config);
+
+  if (!realtimeClient?.set) {
+    throw new Error("Live session is not ready. Connect the camera first.");
+  }
+  if (!garmentImage) {
+    throw new Error("Upload a garment in the Garment Image section first.");
+  }
+
+  await realtimeClient.set({
+    prompt,
+    enhance,
+    image: garmentImage
+  });
+
+  return { prompt, enhance, hasImage: true, accessoryMode };
+}
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-/** Human-readable duration from Decart generation seconds or wall-clock fallback. */
 export function formatLiveSessionDuration(seconds) {
   const s = Math.max(0, Math.floor(Number(seconds) || 0));
   if (s < 60) return `${s} second${s === 1 ? "" : "s"}`;
@@ -43,9 +101,6 @@ const MAX_MID_SESSION_ROTATIONS = Math.min(
   Math.max(4, Number.parseInt(String(import.meta.env.VITE_DECART_LIVE_MAX_MID_ROTATIONS || "16"), 10) || 16)
 );
 
-/**
- * True if the error likely indicates quota / credits / billing so another API key may work.
- */
 export function isDecartQuotaOrCreditError(err) {
   if (err == null) return false;
   const msg = String(err.message ?? err).toLowerCase();
@@ -73,10 +128,6 @@ export function isDecartQuotaOrCreditError(err) {
   return hints.some((h) => msg.includes(h));
 }
 
-/**
- * Prefer a short-lived token from our API (server rotates keys until one mints a token).
- * Falls back to VITE_DECART_API_KEY only when the token request fails (e.g. local dev without login).
- */
 export async function resolveDecartRealtimeApiKey() {
   const res = await fetch(`${API_URL}/api/decart/realtime-token`, {
     method: "POST",
@@ -97,41 +148,39 @@ export async function resolveDecartRealtimeApiKey() {
   return { apiKey, modelId };
 }
 
-async function connectAndSetWithToken(stream, garmentFile, modelIdOverride, onRemoteStream) {
+async function connectAndSetWithToken(stream, liveConfig, modelIdOverride, onRemoteStream) {
   const { apiKey, modelId } = await resolveDecartRealtimeApiKey();
   const model = models.realtime(modelIdOverride || modelId);
   const client = createDecartClient({ apiKey });
+  const resolved = resolveLiveRealtimeConfig(liveConfig);
+
+  if (import.meta.env.DEV) {
+    console.info("[decart-live] set()", {
+      accessoryMode: resolved.accessoryMode,
+      enhance: resolved.enhance,
+      garmentImageName: liveConfig.garmentImage?.name,
+      promptLength: resolved.prompt?.length
+    });
+  }
+
   const realtimeClient = await client.realtime.connect(stream, {
     model,
     mirror: LIVE_MIRROR,
     onRemoteStream
   });
-  await realtimeClient.set({
-    prompt: LIVE_VTON_PROMPT,
-    enhance: true,
-    image: garmentFile
-  });
+
+  await sleep(700);
+  await applyLiveRealtimeSet(realtimeClient, liveConfig);
   return realtimeClient;
 }
 
 /**
- * WebRTC live virtual try-on with API key rotation:
- * - Retries connect+set on credit/quota-style failures (new token / shuffled server keys each attempt).
- * - Subscribes to `error` on the realtime client; on credit-like errors, disconnects and reconnects with a fresh token.
- *
  * @param {object} opts
- * @param {{ current: { inputStream?: MediaStream | null; realtimeClient?: unknown | null; disposeRotation?: (() => void) | null }}} opts.sessionRef
- * @param {File} opts.garmentFile
- * @param {(stream: MediaStream) => void} [opts.onRemoteStream]
- * @param {(stream: MediaStream) => void} [opts.onLocalStream]
- * @param {(data: { seconds: number; totalSeconds: number }) => void} [opts.onGenerationTick]
- * @param {(data: { generationSeconds: number; wallSeconds: number }) => void} [opts.onSessionEnd]
- * @param {string} [opts.modelId]
- * @returns {{ inputStream: MediaStream, disposeRotation: () => void }}
+ * @param {{ accessoryMode?: boolean, prompt?: string, enhance?: boolean, garmentImage?: File | null }} opts.liveConfig
  */
 export async function connectDecartVirtualTryOn({
   sessionRef,
-  garmentFile,
+  liveConfig,
   onRemoteStream,
   onLocalStream,
   onGenerationTick,
@@ -140,6 +189,11 @@ export async function connectDecartVirtualTryOn({
 }) {
   const modelIdFinal = modelIdOpt || DEFAULT_MODEL;
   const model = models.realtime(modelIdFinal);
+  const resolved = resolveLiveRealtimeConfig(liveConfig);
+
+  if (!resolved.garmentImage) {
+    throw new Error("Upload a garment in the Garment Image section before connecting live try-on.");
+  }
 
   let stream;
   try {
@@ -177,7 +231,6 @@ export async function connectDecartVirtualTryOn({
   let accumulatedGenerationSeconds = 0;
   let currentConnectionSeconds = 0;
   const sessionStartedAt = Date.now();
-  /** @type {(() => void)[]} */
   const listenerCleanups = [];
 
   const flushGenerationToAccumulated = () => {
@@ -190,10 +243,7 @@ export async function connectDecartVirtualTryOn({
   const emitSessionEnd = () => {
     const generationSeconds = getTotalGenerationSeconds();
     const wallSeconds = Math.max(0, Math.round((Date.now() - sessionStartedAt) / 1000));
-    onSessionEnd?.({
-      generationSeconds,
-      wallSeconds
-    });
+    onSessionEnd?.({ generationSeconds, wallSeconds });
   };
 
   const clearListeners = () => {
@@ -270,7 +320,7 @@ export async function connectDecartVirtualTryOn({
         for (let i = 0; i < MAX_TOKEN_CONNECT_ATTEMPTS; i += 1) {
           if (disposed) return;
           try {
-            const rtc = await connectAndSetWithToken(stream, garmentFile, modelIdOpt, onRemoteStream);
+            const rtc = await connectAndSetWithToken(stream, liveConfig, modelIdOpt, onRemoteStream);
             if (disposed) {
               try {
                 rtc.disconnect?.();
@@ -313,7 +363,7 @@ export async function connectDecartVirtualTryOn({
       throw new Error("Aborted");
     }
     try {
-      const rtc = await connectAndSetWithToken(stream, garmentFile, modelIdOpt, onRemoteStream);
+      const rtc = await connectAndSetWithToken(stream, liveConfig, modelIdOpt, onRemoteStream);
       attachRtc(rtc, scheduleRotate);
 
       const disposeRotation = () => {

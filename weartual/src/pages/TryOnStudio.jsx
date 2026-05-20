@@ -39,7 +39,12 @@ import {
   saveOutfitRating
 } from "../services/outfitHistory";
 import { sanitizePublicErrorMessage } from "../lib/publicErrorMessage";
-import { connectDecartVirtualTryOn, formatLiveSessionDuration } from "../services/decartRealtime";
+import {
+  applyLiveRealtimeSet,
+  connectDecartVirtualTryOn,
+  formatLiveSessionDuration,
+  getAccessoryDefaultPrompt
+} from "../services/decartRealtime";
 import { useTheme } from "../context/ThemeContext.jsx";
 
 const PERSON_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
@@ -110,6 +115,10 @@ export default function TryOnStudio({ user, authLoading = false, onSessionExpire
   const [liveGenerationSeconds, setLiveGenerationSeconds] = useState(0);
   /** Shown after disconnect with how long the live session ran. */
   const [liveSessionSummary, setLiveSessionSummary] = useState("");
+  const [liveCustomPrompt, setLiveCustomPrompt] = useState(() => getAccessoryDefaultPrompt());
+  /** On = extra accessory prompt layered on top of garment (garment image always used as reference). */
+  const [liveAccessoryMode, setLiveAccessoryMode] = useState(false);
+  const [liveApplying, setLiveApplying] = useState(false);
   const liveVideoRef = useRef(null);
   /** Wrapper for browser fullscreen on the live try-on preview. */
   const liveFeedFsRef = useRef(null);
@@ -203,6 +212,7 @@ export default function TryOnStudio({ user, authLoading = false, onSessionExpire
     const v = liveVideoRef.current;
     if (v) v.srcObject = null;
     setLiveCameraActive(false);
+    setLiveApplying(false);
   }, []);
 
   useEffect(() => {
@@ -240,6 +250,15 @@ export default function TryOnStudio({ user, authLoading = false, onSessionExpire
     }
   }, [liveCameraActive]);
 
+  const buildLiveConfig = useCallback(
+    () => ({
+      accessoryMode: liveAccessoryMode,
+      prompt: liveAccessoryMode ? liveCustomPrompt : undefined,
+      garmentImage: garmentFile
+    }),
+    [liveAccessoryMode, liveCustomPrompt, garmentFile]
+  );
+
   const startLiveCamera = useCallback(async () => {
     setLiveCameraError("");
     stopLiveCamera();
@@ -254,7 +273,7 @@ export default function TryOnStudio({ user, authLoading = false, onSessionExpire
       return;
     }
     if (!garmentFile) {
-      setLiveCameraError("Add a garment image first — live try-on needs a reference outfit.");
+      setLiveCameraError("Upload a garment in the Garment Image section before connecting live try-on.");
       return;
     }
     if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
@@ -266,13 +285,9 @@ export default function TryOnStudio({ user, authLoading = false, onSessionExpire
     try {
       await connectDecartVirtualTryOn({
         sessionRef: liveTryOnSessionRef,
-        garmentFile,
-        onLocalStream: (localStream) => {
-          const el = liveVideoRef.current;
-          if (el) {
-            el.srcObject = localStream;
-            el.play().catch(() => {});
-          }
+        liveConfig: buildLiveConfig(),
+        onLocalStream: () => {
+          /* Camera warms up in the SDK; preview shows Decart output only (onRemoteStream). */
         },
         onRemoteStream: (editedStream) => {
           const el = liveVideoRef.current;
@@ -302,7 +317,24 @@ export default function TryOnStudio({ user, authLoading = false, onSessionExpire
           : msg
       );
     }
-  }, [user, authLoading, garmentFile, stopLiveCamera]);
+  }, [user, authLoading, buildLiveConfig, garmentFile, stopLiveCamera]);
+
+  const applyLiveToSession = useCallback(async () => {
+    const rtc = liveTryOnSessionRef.current?.realtimeClient;
+    if (!rtc) {
+      setLiveCameraError("Connect live try-on first.");
+      return;
+    }
+    setLiveApplying(true);
+    setLiveCameraError("");
+    try {
+      await applyLiveRealtimeSet(rtc, buildLiveConfig());
+    } catch (e) {
+      setLiveCameraError(sanitizePublicErrorMessage(String(e?.message || e || "Could not update live session.")));
+    } finally {
+      setLiveApplying(false);
+    }
+  }, [buildLiveConfig]);
 
   const handlePersonInputModeChange = useCallback(
     (mode) => {
@@ -1244,6 +1276,95 @@ export default function TryOnStudio({ user, authLoading = false, onSessionExpire
                         : "min-h-[170px] justify-center gap-3 sm:min-h-[190px]"
                     }`}
                   >
+                    <motion.div
+                      className="mb-4 w-full max-w-xl space-y-3 text-left"
+                      initial={reduceMotion ? false : { opacity: 0, y: 6 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <div>
+                        <div className="mb-2 flex items-center justify-between gap-3">
+                          <span className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                            Add accessories
+                          </span>
+                          <button
+                            type="button"
+                            role="switch"
+                            aria-checked={liveAccessoryMode}
+                            onClick={() => setLiveAccessoryMode((v) => !v)}
+                            className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors ${
+                              liveAccessoryMode
+                                ? "bg-brand-600 dark:bg-violet-600"
+                                : "bg-slate-300 dark:bg-slate-600"
+                            }`}
+                          >
+                            <span
+                              className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
+                                liveAccessoryMode ? "translate-x-6" : "translate-x-1"
+                              }`}
+                            />
+                            <span className="sr-only">Add accessories</span>
+                          </button>
+                        </div>
+                        <p className="mt-2 rounded-lg border border-slate-200 bg-white/80 px-3 py-2 text-xs text-slate-600 dark:border-slate-600 dark:bg-slate-900/80 dark:text-slate-300">
+                          Garment reference (always): your <span className="font-semibold">Garment Image</span> above.
+                          {garmentPreview ? (
+                            <span className="mt-2 flex items-center gap-2">
+                              <img
+                                src={garmentPreview}
+                                alt="Selected garment"
+                                className="h-12 w-12 rounded-md border border-slate-200 object-cover dark:border-slate-600"
+                              />
+                            </span>
+                          ) : (
+                            <span className="mt-1 block text-amber-700 dark:text-amber-400">
+                              Upload a garment before connecting.
+                            </span>
+                          )}
+                        </p>
+                        {liveAccessoryMode ? (
+                          <>
+                            <label
+                              htmlFor="live-custom-prompt"
+                              className="mb-1 mt-3 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400"
+                            >
+                              Extra accessory prompt
+                            </label>
+                            <textarea
+                              id="live-custom-prompt"
+                              rows={3}
+                              value={liveCustomPrompt}
+                              onChange={(e) => setLiveCustomPrompt(e.target.value)}
+                              placeholder="e.g. Add round glasses and a black cap"
+                              className="mb-1 w-full resize-y rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+                            />
+                            <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                              Layered on top of the garment — glasses, watch, hat, cap, etc.
+                            </p>
+                          </>
+                        ) : null}
+                      </div>
+                      {liveAccessoryMode ? (
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                          Garment reference stays locked; accessory text is merged into the same prompt (not a second step).
+                        </p>
+                      ) : null}
+                      {liveCameraActive ? (
+                        <button
+                          type="button"
+                          disabled={liveApplying}
+                          onClick={() => void applyLiveToSession()}
+                          className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-500 disabled:opacity-60"
+                        >
+                          <Wand2 className="h-4 w-4" aria-hidden />
+                          {liveApplying
+                            ? "Applying…"
+                            : liveAccessoryMode
+                              ? "Re-apply garment + accessory"
+                              : "Re-apply garment"}
+                        </button>
+                      ) : null}
+                    </motion.div>
                     <div
                       ref={liveFeedFsRef}
                       className={`relative w-full min-h-0 ${
@@ -1285,7 +1406,8 @@ export default function TryOnStudio({ user, authLoading = false, onSessionExpire
                     </div>
                     {!liveCameraActive ? (
                       <p className="text-sm text-slate-500 dark:text-slate-400">
-                        {liveSessionSummary || "Add a garment image, then connect. The preview shows your live camera with the outfit applied."}
+                        {liveSessionSummary ||
+                          "Set a prompt and reference image above, then connect. The camera preview shows Decart’s result."}
                       </p>
                     ) : (
                       <div className="flex flex-col items-center gap-1">
@@ -1295,7 +1417,7 @@ export default function TryOnStudio({ user, authLoading = false, onSessionExpire
                           </p>
                         ) : null}
                         <p className="text-xs text-slate-500 dark:text-slate-400">
-                          Tip: capture a frame if you also want to run offline Generate with the same look.
+                          Change prompt or reference above, then click Apply — or capture a frame for offline Generate.
                         </p>
                       </div>
                     )}
