@@ -1,6 +1,6 @@
 # Weartual
 
-AI virtual try-on: upload a **person** (photo or video) and a **garment** image, then generate a new look. Includes a **live camera** mode powered by Decart WebRTC.
+AI virtual try-on: upload a **person** (photo or video) and a **garment** image, then generate a new look. Includes a **live camera** mode over WebRTC.
 
 This repo contains two apps:
 
@@ -9,7 +9,7 @@ This repo contains two apps:
 | `weartual/` | React + Vite | Web UI (PWA) |
 | `server/` | Express + MongoDB + Python | API, auth, try-on pipelines |
 
-For architecture, API tables, and env var reference, see **[PROJECT.md](./PROJECT.md)**.
+For architecture and API tables, see **[PROJECT.md](./PROJECT.md)**.
 
 ---
 
@@ -21,12 +21,7 @@ Install these before you start:
 - **npm**
 - **Python** 3.10+ (`python` or `python3` on your PATH)
 - **MongoDB** (local or [MongoDB Atlas](https://www.mongodb.com/cloud/atlas))
-- Accounts / API keys for:
-  - [Decart](https://platform.decart.ai) — image, video, and live try-on
-  - [Cloudinary](https://cloudinary.com) — storing uploads and results
-  - [Photoroom](https://www.photoroom.com/api) — optional garment “ghost mannequin” prep
-  - [Google Cloud Console](https://console.cloud.google.com) — OAuth client ID (Sign in with Google)
-  - SMTP (e.g. Gmail app password) — password reset and feedback emails
+- Accounts needed for media storage, email, and Google Sign-In (ask the team for the configured credentials — do not commit secrets)
 
 ---
 
@@ -42,53 +37,18 @@ cd frontend/mushi
 
 ### 2. Backend environment
 
-Create `server/.env` with at least:
-
-```env
-PORT=5001
-NODE_ENV=development
-MONGODB_URI=your_mongodb_cluster_uri
-JWT_SECRET=your_long_random_secret
-JWT_EXPIRES_IN=7d
-GOOGLE_CLIENT_ID=your_google_client_id
-CLIENT_URL=http://localhost:5173
-
-CLOUDINARY_CLOUD_NAME=
-CLOUDINARY_API_KEY=
-CLOUDINARY_API_SECRET=
-
-PHOTOROOM_API_KEY=
-
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USER=
-SMTP_PASS=
-FROM_EMAIL=
-COMPANY_EMAIL=
-
-GHOST_GARMENT_ENABLED=true/false         #connected with phootroom ghost mannequin api scripts in preprocessing ghost.py
-IMAGE_TRYON_FAST=false/true              #run processes in parallel in backend reduce overall try on timing to 20-25 seconds if GHOST_GARMENT_ENABLED=false, if true its rake arounds 30-35 seconds, but true will never change the face or anything else of the input person image, but it will also not be that much realstic as of false.
-```
+Create `server/.env` with the values provided for your environment (port, database, auth, media, email, CORS origins, and try-on related flags).
 
 Use your real values. Do **not** commit `.env`.
 
-### 3. Decart API keys (separate from `.env`)
-
-```bash
-cp server/preprocessing/vendor_cache/llvmpass.registry.example \
-   server/preprocessing/vendor_cache/llvmpass.registry
-```
-
-Edit `llvmpass.registry` and add one or more Decart tokens (comma- or line-separated). This file is gitignored.
-
-### 4. Install backend + Python dependencies
+### 3. Install backend + Python dependencies
 
 ```bash
 cd server
 npm install
 ```
 
-`postinstall` runs `pip install -r requirements.txt` into `server/python_vendor/` so `photo.py` and `irl.py` can import `decart`.
+`postinstall` installs Python packages from `requirements.txt` into `server/python_vendor/`.
 
 If Python install fails, install manually:
 
@@ -96,9 +56,9 @@ If Python install fails, install manually:
 python -m pip install -r requirements.txt -t python_vendor
 ```
 
-### 5. Frontend environment
+### 4. Frontend environment
 
-Create `weartual/.env`:
+Create `weartual/.env` with at least:
 
 ```env
 VITE_API_URL=http://localhost:5001
@@ -107,7 +67,7 @@ VITE_GOOGLE_CLIENT_ID=your_google_client_id
 
 `VITE_API_URL` must match the backend `PORT` and appear in `CLIENT_URL` for CORS and cookies.
 
-### 6. Install frontend
+### 5. Install frontend
 
 ```bash
 cd ../weartual
@@ -147,7 +107,7 @@ Check the API: `GET http://localhost:5001/api/health` → `{ "success": true, ..
 ### Sign up / log in
 
 1. Open **Sign up** or **Log in** from the navbar.
-2. Use email + password, or **Continue with Google** (same `GOOGLE_CLIENT_ID` on frontend and backend).
+2. Use email + password, or **Continue with Google** (same Google client ID on frontend and backend).
 3. Session is stored in an HTTP-only cookie; stay logged in across refreshes.
 
 **Forgot password:** `/forgot-password` → email link → `/reset-password/:token`.
@@ -164,33 +124,22 @@ Main workflow:
 
 **What happens:**
 
-| Person input | Pipeline | Result |
-|--------------|----------|--------|
-| Photo | Photoroom ghost mannequin (if enabled) → Decart `photo.py` | PNG image |
-| Video | Decart `irl.py` | MP4 video |
+| Person input | Result |
+|--------------|--------|
+| Photo | Generated try-on image (PNG) |
+| Video | Generated try-on video (MP4) |
 
-Results are saved to your account and shown in the studio. Failed “no change” image try-ons usually mean clearer front-facing photos or a stronger prompt in `server/preprocessing/vendor_cache/prompts/image_tryon.txt`.
-
-**Faster image mode (optional):** set `IMAGE_TRYON_FAST=true` in `server/.env` (lower resolution, quicker).
-
-**Skip Photoroom:** set `GHOST_GARMENT_ENABLED=false` (faster, weaker garment prep).
+Results are saved to your account and shown in the studio. If an image try-on fails with “no change,” try clearer front-facing photos.
 
 ### Live camera try-on
 
 1. In Studio, set **Person input** to **Live**.
 2. Upload a **Garment Image** (required before connecting).
 3. Allow camera permission and connect live try-on.
-4. The app requests a short-lived token from `POST /api/decart/realtime-token`.
-5. Your garment is sent to Decart as the **only** reference image; processed video appears in the preview.
-6. Optionally turn on **Add accessories** and describe extras (glasses, watch, hat, cap, etc.) in the text field — this is merged into the same prompt as the garment try-on, not a second image.
-7. Use **Re-apply garment** / **Re-apply garment + accessory** if you change the garment or accessory text mid-session.
-8. Capture a frame to run an **offline** image try-on from that capture.
-
-**Defaults and env:**
-
-- Garment VTON wording is fixed in `weartual/src/services/decartRealtime.js` (`PROMPT_GARMENT_LIVE`).
-- `VITE_DECART_VTON_PROMPT` in `weartual/.env` sets the default **accessory** text when the extra prompt field is empty.
-- Live mode keeps `enhance: false` so the garment reference stays faithful.
+4. Processed video appears in the preview.
+5. Optionally turn on **Add accessories** and describe extras (glasses, watch, hat, cap, etc.).
+6. Use **Re-apply garment** / **Re-apply garment + accessory** if you change the garment or accessory text mid-session.
+7. Capture a frame to run an **offline** image try-on from that capture.
 
 ### Outfit history (`/history`)
 
@@ -205,22 +154,6 @@ Results are saved to your account and shown in the studio. Failed “no change�
 
 - **/** — Landing / marketing
 - **/about**, **/contact** — Info and feedback form
-
----
-
-## Editing prompts and keys
-
-| What | Where |
-|------|--------|
-| Image try-on prompt | `server/preprocessing/vendor_cache/prompts/image_tryon.txt` |
-| Video try-on prompt | `server/preprocessing/vendor_cache/prompts/video_tryon.txt` |
-| Decart API keys | `server/preprocessing/vendor_cache/llvmpass.registry` |
-| Live accessory default prompt (browser) | `VITE_DECART_VTON_PROMPT` in `weartual/.env` |
-| Live garment VTON prompt (code) | `PROMPT_GARMENT_LIVE` in `weartual/src/services/decartRealtime.js` |
-
-Lines starting with `#` in `.txt` prompt files are comments.
-
-Restart the backend after changing registry or env vars.
 
 ---
 
@@ -242,7 +175,7 @@ cd server
 npm start
 ```
 
-Set `NODE_ENV=production`, production `MONGODB_URI`, `CLIENT_URL` (include your frontend origin), and all API keys. Copy `llvmpass.registry` to the server; never commit it.
+Set `NODE_ENV=production`, production database URI, `CLIENT_URL` (include your frontend origin), and the rest of your private server configuration. Never commit secrets.
 
 Ensure `CLIENT_URL` lists every frontend origin that should call the API (comma-separated).
 
@@ -253,12 +186,11 @@ Ensure `CLIENT_URL` lists every frontend origin that should call the API (comma-
 | Problem | What to check |
 |---------|----------------|
 | Frontend can’t reach API | `VITE_API_URL`, backend running, `CLIENT_URL` includes `http://localhost:5173` |
-| Try-on “not available” | `llvmpass.registry` exists and has valid Decart keys |
-| Python / Decart import error | Re-run `npm install` in `server/` or manual `pip install -r requirements.txt -t python_vendor` |
-| Ghost step fails | `PHOTOROOM_API_KEY` in `server/.env`, or disable with `GHOST_GARMENT_ENABLED=false` |
-| Google login fails | Same client ID in `GOOGLE_CLIENT_ID` and `VITE_GOOGLE_CLIENT_ID`; authorized origins in Google Console |
+| Try-on “not available” | Backend env and try-on credentials are configured; restart the API after changes |
+| Python import error | Re-run `npm install` in `server/` or manual `pip install -r requirements.txt -t python_vendor` |
+| Google login fails | Same Google client ID on frontend and backend; authorized origins in Google Console |
 | Cookies / auth lost on deploy | Production: `NODE_ENV=production`, HTTPS, `CLIENT_URL` matches frontend origin |
-| Thousands of git changes | Large folders under `preprocessing/` should be gitignored; only track `photo.py`, `irl.py`, `ghost/`, `vendor_cache/` (see root `.gitignore`) |
+| Thousands of git changes | Large folders under `preprocessing/` should be gitignored; see root `.gitignore` |
 
 ---
 
@@ -276,7 +208,7 @@ Ensure `CLIENT_URL` lists every frontend origin that should call the API (comma-
 
 ## Documentation
 
-- **[PROJECT.md](./PROJECT.md)** — Full reference: routes, services, env vars, database models, flow diagrams.
+- **[PROJECT.md](./PROJECT.md)** — Full reference: routes, services, database models, flow diagrams.
 
 ---
 
