@@ -11,6 +11,7 @@ import {
   Download
 } from "lucide-react";
 import { easeOut, fadeUpItem, staggerChildren } from "../lib/motionPresets";
+import RollingText from "../components/RollingText";
 
 const heroExamples = [
   {
@@ -109,13 +110,19 @@ export default function LandingPage() {
             >
               <Sparkles className="w-4 h-4" /> AI-Powered Virtual Try-On
             </motion.span>
-            <motion.h1 variants={heroItem} className="text-4xl md:text-6xl leading-tight font-bold mb-6">
-              Try Before You Buy -
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-700 to-indigo-600">
-                {" "}
-                Virtually
-              </span>
-            </motion.h1>
+            <h1
+              className="text-4xl md:text-6xl leading-tight font-bold mb-6"
+              aria-label="Try Before You Buy - Virtually"
+            >
+              <RollingText text="Try Before You Buy -" delay={0.12} />
+              {" "}
+              <RollingText
+                text="Virtually"
+                split="word"
+                delay={0.42}
+                className="text-transparent bg-clip-text bg-gradient-to-r from-brand-700 to-indigo-600"
+              />
+            </h1>
             <motion.p
               variants={heroItem}
               className="text-lg md:text-xl text-slate-600 max-w-3xl mx-auto leading-relaxed dark:text-slate-400 mb-10"
