@@ -142,7 +142,7 @@ const Login = ({ onLogin }) => {
                   name="email"
                   type="email"
                   required
-                  placeholder="hello@example.com"
+                  placeholder="you@weartual.com"
                   value={formData.email}
                   onChange={handleInputChange}
                   className="block w-full rounded-xl border border-slate-300 bg-white py-3 pl-11 pr-4 text-slate-900 transition-all placeholder:text-slate-400 focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 sm:text-sm dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500"
@@ -257,15 +257,13 @@ const Login = ({ onLogin }) => {
 
       {/* Right Image Section */}
       <div className="hidden lg:block relative w-0 flex-1 overflow-hidden">
-        <div className="absolute inset-0 bg-brand-900 mix-blend-multiply opacity-20 z-10"></div>
         <img
-          className="absolute inset-0 h-full w-full object-cover"
-          src="/fashion-bg.png"
-          alt="Virtual Try On Experience"
+          className="absolute inset-0 h-full w-full object-cover object-top"
+          src="/img2_after.png"
+          alt="Weartual virtual try-on result"
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 via-slate-900/20 to-transparent z-10"></div>
+        <div className="absolute inset-0 bg-gradient-to-t from-slate-900/85 via-slate-900/25 to-transparent z-10"></div>
         
-        {/* Overlaid Content */}
         <motion.div
           className="absolute bottom-0 left-0 right-0 p-12 z-20 text-white"
           initial={reduceMotion ? false : { opacity: 0, y: 28 }}
@@ -282,7 +280,7 @@ const Login = ({ onLogin }) => {
               reduceMotion ? { duration: 0 } : { duration: 0.4, ease: easeOut, delay: 0.14 }
             }
           >
-            Premium Experience
+            Weartual
           </motion.div>
           <motion.h2
             className="text-4xl font-serif font-medium leading-tight mb-4"
@@ -292,7 +290,7 @@ const Login = ({ onLogin }) => {
               reduceMotion ? { duration: 0 } : { duration: 0.45, ease: easeOut, delay: 0.2 }
             }
           >
-            See it on you.<br />Before you buy.
+            Try before you buy.<br />Virtually.
           </motion.h2>
           <motion.p
             className="text-lg text-slate-300 max-w-md"
@@ -302,7 +300,7 @@ const Login = ({ onLogin }) => {
               reduceMotion ? { duration: 0 } : { duration: 0.45, ease: easeOut, delay: 0.26 }
             }
           >
-            Our advanced AI matching technology creates a flawless virtual reflection, enabling the perfect fit every time.
+            Upload a photo, pick a garment, and see a realistic try-on preview in seconds.
           </motion.p>
         </motion.div>
       </div>
